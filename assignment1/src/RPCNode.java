@@ -15,10 +15,11 @@ public class RPCNode extends ReliableDeliveryNode {
 		
 		StringBuffer sb = serialize(methodCall);
 		
-		this.sendMessage(targetSender, Utility.stringToByteArray(sb.toString()));
+		super.sendReliableMessage(targetSender, Utility.stringToByteArray(sb.toString()));
 	}
 	
-	protected void onMessageReceived(byte[] msg) {
+	@Override
+	protected void onReliableMessageReceived(byte[] msg) {
 		StringBuffer sb = new StringBuffer(Utility.byteArrayToString(msg));
 		RPCMethodCall methodCall = parseString(sb);
 		onMethodCalled(methodCall.getMethodName(), methodCall.getParams());

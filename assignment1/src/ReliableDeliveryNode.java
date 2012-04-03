@@ -6,6 +6,8 @@ import java.util.*;
 // - Duplicates (x): 
 // - At most once (x):
 // - Packet loss:
+
+
 // - Reordering:
 public class ReliableDeliveryNode extends Node {
 	private int m_sendSequence;
@@ -39,7 +41,7 @@ public class ReliableDeliveryNode extends Node {
 				byte[] buffer = new byte[msg.length - 4];
 				System.arraycopy(msg, 4, buffer, 0, buffer.length);
 				
-				onMessageReceived(buffer);
+				onReliableMessageReceived(buffer);
 				this.sendAck(from.intValue(), sequence);
 			} else if (protocol == MESSAGE_TYPE.ACK){
 				info("Received ack for sequence number " + sequence);
@@ -59,7 +61,7 @@ public class ReliableDeliveryNode extends Node {
 			int targetSender = Integer.parseInt(parts[1]);
 			String msgStr = parts[2]; 
 			byte[] msg = Utility.stringToByteArray(msgStr);
-			this.sendMessage(targetSender, msg);
+			this.sendReliableMessage(targetSender, msg);
 		}
 		info("Command: " + command);
 	}
@@ -91,11 +93,11 @@ public class ReliableDeliveryNode extends Node {
 	}
 	
 	/**
-	 * Methods that subclasses will call to reliably deliver message
+	 * Methods that subclasses will call to reliably send a message
 	 * @param targetSender
 	 * @param msg
 	 */
-	protected void sendMessage(int targetSender, byte[] msg) {
+	protected void sendReliableMessage(int targetSender, byte[] msg) {
 		byte[] buffer = new byte[msg.length + 4];
 		addInt(buffer, 0, this.m_sendSequence);
 		System.arraycopy(msg, 0, buffer, 4, msg.length);
@@ -124,7 +126,7 @@ public class ReliableDeliveryNode extends Node {
 	 * Method that subclasses will override to handle reliably message received stuff
 	 * @param msg
 	 */
-	protected void onMessageReceived(byte[] msg) {
+	protected void onReliableMessageReceived(byte[] msg) {
 		info("Received message " + Utility.byteArrayToString(msg));
 	}
 }
