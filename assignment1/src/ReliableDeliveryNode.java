@@ -11,11 +11,12 @@ public class ReliableDeliveryNode extends Node {
 	private int m_sendSequence;
 	private HashSet<Integer> m_receivedSequence = new HashSet<Integer>();
 	private HashSet<Integer> m_waitingForAck = new HashSet<Integer>();
+	//private PriorityQueue<> m_heap = new PriorityQueue();
 	
 	private class MESSAGE_TYPE {
 		public final static int UNKNOWN=0;
-		public final static int NORMAL=0;
-		public final static int ACK=0;
+		public final static int NORMAL=1;
+		public final static int ACK=2;
 	}
 
 	@Override
@@ -28,7 +29,7 @@ public class ReliableDeliveryNode extends Node {
 		int sequence = getInt(msg, 0);
 		
 		if (this.m_receivedSequence.contains(sequence)) {
-			// TODO: Send ack again
+			this.sendAck(from.intValue(), sequence);
 			info("Already seen sequence number " + sequence);
 		} else {
 			if (protocol == MESSAGE_TYPE.NORMAL) {
@@ -39,9 +40,10 @@ public class ReliableDeliveryNode extends Node {
 				System.arraycopy(msg, 4, buffer, 0, buffer.length);
 				
 				onMessageReceived(buffer);
-				// TODO: send ack
+				this.sendAck(from.intValue(), sequence);
 			} else if (protocol == MESSAGE_TYPE.ACK){
-				// TODO: timer, mark as received
+				info("Received ack for sequence number " + sequence);
+				this.m_waitingForAck.remove(sequence);
 			} else {
 				// TODO: throw exception!
 			}
@@ -72,6 +74,12 @@ public class ReliableDeliveryNode extends Node {
 	private int getInt(byte[] buffer, int offset) {
 		return (buffer[offset] << 24) + ((buffer[offset + 1] & 0xFF) << 16) +
 				+ ((buffer[offset + 2] & 0xFF) << 8) + (buffer[offset + 3] & 0xFF);
+	}
+	
+	private void sendAck(int targetSender, int sequenceNumber) {
+		byte[] buffer = new byte[4];
+		addInt(buffer, 0, sequenceNumber);
+		this.send(targetSender, MESSAGE_TYPE.ACK, buffer);
 	}
 	
 	protected static void warn(String msg) {

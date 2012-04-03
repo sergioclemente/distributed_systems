@@ -566,8 +566,8 @@ public class Simulator extends Manager {
 		}
 	}
 	
-	// EXTRA stuff
-	boolean  m_prompt = false;
+	// set to true if you want to run in a quick mode
+	boolean  m_prompt = true;
 
 	/**
 	 * Reorders and executes all the events for the current round.
