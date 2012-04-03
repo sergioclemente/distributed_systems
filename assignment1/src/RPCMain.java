@@ -10,6 +10,5 @@ public class RPCMain {
 		System.out.println(sb.toString());
 		
 		RPCMethodCall methodCall = RPCNode.parseString(sb);
-		
 	}
 }
