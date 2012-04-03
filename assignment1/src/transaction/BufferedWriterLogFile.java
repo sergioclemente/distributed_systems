@@ -16,8 +16,8 @@ public class BufferedWriterLogFile implements ILogFile {
 	}
 	
 	@Override
-	public void append(String str) throws IOException {
-		this.m_writer.append(str);
+	public void append(String str)  {
+		//this.m_writer.append(str);
 
 	}
 
