@@ -1,4 +1,5 @@
-	import edu.washington.cs.cse490h.lib.Callback;
+package node.reliable;
+import edu.washington.cs.cse490h.lib.Callback;
 import edu.washington.cs.cse490h.lib.Node;
 import edu.washington.cs.cse490h.lib.Utility;
 
@@ -9,21 +10,17 @@ import java.util.*;
 // - Duplicates (x): check if already received before processing
 // - At most once (x): set the received before processing
 // - Packet loss (x): Added ack
-// - Reordering:
+// - Reordering: (x): Added reordering
 public class ReliableDeliveryNode extends Node {
-	private int m_sendSequence;
-	private HashSet<Integer> m_receivedSequence = new HashSet<Integer>();
-	private Hashtable<Integer, byte[]> m_waitingForAck = new Hashtable<Integer, byte[]>();
+	private SessionManager m_sessionManager = new SessionManager();
 	private Method m_timeoutMethod;
-	
 	private final static int TIMEOUT = 3;
-
 	
 	public ReliableDeliveryNode() {
 		try {
-			this.m_timeoutMethod = Callback.getMethod("onTimeout", this, new String[]{ "java.lang.Integer", "java.lang.Integer" });
+			// [B is the same as byte[]
+			this.m_timeoutMethod = Callback.getMethod("onTimeout", this, new String[]{ "java.lang.Integer", "java.lang.Integer", "[B" });
 		} catch (Exception e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}
@@ -43,38 +40,36 @@ public class ReliableDeliveryNode extends Node {
 	public void onReceive(Integer from, int protocol, byte[] msg) {
 		int sequence = getInt(msg, 0);
 		
-		if (this.m_receivedSequence.contains(sequence)) {
+		Session session = this.m_sessionManager.getSession(from);
+		
+		if (session.didAlreadyReceiveSequence(sequence)) {
 			info("Already seen sequence number " + sequence);
 			this.sendAck(from.intValue(), sequence);
 		} else {
 			if (protocol == MESSAGE_TYPE.NORMAL) {
 				// At most once semantics. 
-				this.m_receivedSequence.add(sequence);
+				session.markSequenceAsReceived(sequence);
 				
-				byte[] buffer = new byte[msg.length - 4];
-				System.arraycopy(msg, 4, buffer, 0, buffer.length);
+				session.addToReceiveQueue(sequence, msg);
 				
-				// Handle reorder
-				
-				onReliableMessageReceived(buffer);
+				byte[] nextMsg;
+				while ( (nextMsg=session.getNextReceiveBuffer()) != null) {
+					// Remove the sequence number before firing the event
+					byte[] nextMsgTruncated = new byte[nextMsg.length - 4];
+					System.arraycopy(nextMsg, 4, nextMsgTruncated, 0, nextMsgTruncated.length);
+					
+					this.onReliableMessageReceived(nextMsgTruncated);
+				}
+
 				this.sendAck(from.intValue(), sequence);
 			} else if (protocol == MESSAGE_TYPE.ACK){
 				info("Received ack for sequence number " + sequence);
-				this.m_waitingForAck.remove(sequence);
+				session.removeFromWaitingForAckList(sequence);
 			} else {
 				// TODO: throw exception!
 			}
 		}
 	}
-	
-	// todo: reorder handling
-	// heap.add(seq);
-	// while ( (seq = heap.topKey()) == lsn + 1) {
-	//   msg = heap.dequeue();
-	// 	 removeTimer();
-	//   onMessageReceived();
-	//   lsn++;
-	// }
 
 	@Override
 	public void onCommand(String command) {
@@ -124,26 +119,27 @@ public class ReliableDeliveryNode extends Node {
 	 * @param msg
 	 */
 	protected void sendReliableMessage(int targetSender, byte[] msg) {
+		Session session = this.m_sessionManager.getSession(targetSender);
+		
 		byte[] buffer = new byte[msg.length + 4];
-		addInt(buffer, 0, this.m_sendSequence);
+		addInt(buffer, 0, session.getSendSequence());
 		System.arraycopy(msg, 0, buffer, 4, msg.length);
-		internalSendPacket(targetSender, this.m_sendSequence, buffer);
-		this.m_sendSequence++;
+		session.addToWaitingForAckList(session.getSendSequence());
+		internalSendPacket(targetSender, session.getSendSequence(), buffer);
+		session.incrementSendSequence();
 	}
 	
 	private void internalSendPacket(int targetSender, int sequenceNumber, byte[] buffer) {
-		if (!this.m_waitingForAck.containsKey(sequenceNumber)) {
-			this.m_waitingForAck.put(sequenceNumber, buffer);
-		}
-		this.addTimeout(new Callback(this.m_timeoutMethod, this, new Object[] {targetSender, sequenceNumber}), TIMEOUT);
+		this.addTimeout(new Callback(this.m_timeoutMethod, this, new Object[] {targetSender, sequenceNumber, buffer}), TIMEOUT);
 		this.send(targetSender, MESSAGE_TYPE.NORMAL, buffer);
 	}
 	
-	public void onTimeout(Integer targetSender, Integer sequenceNumber) {
+	public void onTimeout(Integer targetSender, Integer sequenceNumber, byte[] buffer) {
+		Session session = this.m_sessionManager.getSession(targetSender);
+		
 		// Resent the packet if we didn't receive the ack yet
-		if (this.m_waitingForAck.containsKey(sequenceNumber.intValue())) {
+		if (session.containsInWaitinfForAckList(sequenceNumber.intValue())) {
 			info("Resending packet " + sequenceNumber);
-			byte[] buffer = this.m_waitingForAck.get(sequenceNumber.intValue());
 			this.internalSendPacket(targetSender, sequenceNumber, buffer);			
 		}
 	}
@@ -153,6 +149,6 @@ public class ReliableDeliveryNode extends Node {
 	 * @param msg
 	 */
 	protected void onReliableMessageReceived(byte[] msg) {
-		info("Received message " + Utility.byteArrayToString(msg));
+		info("Received message: " + Utility.byteArrayToString(msg));
 	}
 }
