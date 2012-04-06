@@ -23,7 +23,7 @@ public class RPCNode extends ReliableDeliveryNode {
 	}
 	
 	@Override
-	protected void onReliableMessageReceived(byte[] msg) {
+	protected void onReliableMessageReceived(int from, byte[] msg) {
 		StringBuffer sb = new StringBuffer(Utility.byteArrayToString(msg));
 		RPCMethodCall methodCall = parseString(sb);
 		onMethodCalled(methodCall.getMethodName(), methodCall.getParams());

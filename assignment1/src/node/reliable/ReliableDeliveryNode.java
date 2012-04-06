@@ -6,6 +6,8 @@ import edu.washington.cs.cse490h.lib.Utility;
 import java.lang.reflect.Method;
 import java.util.*;
 
+import util.Tuple;
+
 // This class will handle
 // - Duplicates (x): check if already received before processing
 // - At most once (x): set the received before processing
@@ -49,16 +51,16 @@ public class ReliableDeliveryNode extends Node {
 			if (protocol == MESSAGE_TYPE.NORMAL) {
 				// At most once semantics. 
 				session.markSequenceAsReceived(sequence);
+
+				session.addToReceiveQueue(sequence, from, msg);
 				
-				session.addToReceiveQueue(sequence, msg);
-				
-				byte[] nextMsg;
-				while ( (nextMsg=session.getNextReceiveBuffer()) != null) {
+				Tuple<Integer, byte[]> tuple;
+				while ( (tuple=session.getNextReceiveBuffer()) != null) {
 					// Remove the sequence number before firing the event
-					byte[] nextMsgTruncated = new byte[nextMsg.length - 4];
-					System.arraycopy(nextMsg, 4, nextMsgTruncated, 0, nextMsgTruncated.length);
+					byte[] nextMsgTruncated = new byte[tuple.getT2().length - 4];
+					System.arraycopy(tuple.getT2(), 4, nextMsgTruncated, 0, nextMsgTruncated.length);
 					
-					this.onReliableMessageReceived(nextMsgTruncated);
+					this.onReliableMessageReceived(tuple.getT1(), nextMsgTruncated);
 				}
 
 				this.sendAck(from.intValue(), sequence);
@@ -103,6 +105,11 @@ public class ReliableDeliveryNode extends Node {
 		this.send(targetSender, MESSAGE_TYPE.ACK, buffer);
 	}
 	
+	protected static void error(String msg) {
+		// Put some markers in the begining so we can easily distinguish between system messages
+		System.out.println("********* " + msg);
+	}
+	
 	protected static void warn(String msg) {
 		// Put some markers in the begining so we can easily distinguish between system messages
 		System.out.println("********* " + msg);
@@ -129,6 +136,14 @@ public class ReliableDeliveryNode extends Node {
 		session.incrementSendSequence();
 	}
 	
+	/**
+	 * This method is called when the transport layer gives up sending the packet
+	 * @param endpoint the remote endpoint that the connection is being affected
+	 */
+	protected void onConnectionAborted(int endpoint) {
+		// TODO: not being called yet, just a placeholder method
+	}
+	
 	private void internalSendPacket(int targetSender, int sequenceNumber, byte[] buffer) {
 		this.addTimeout(new Callback(this.m_timeoutMethod, this, new Object[] {targetSender, sequenceNumber, buffer}), TIMEOUT);
 		this.send(targetSender, MESSAGE_TYPE.NORMAL, buffer);
@@ -148,7 +163,7 @@ public class ReliableDeliveryNode extends Node {
 	 * Method that subclasses will override to handle reliably message received stuff
 	 * @param msg
 	 */
-	protected void onReliableMessageReceived(byte[] msg) {
-		info("Received message: " + Utility.byteArrayToString(msg));
+	protected void onReliableMessageReceived(int from, byte[] msg) {
+		info("Received message: - " + Utility.byteArrayToString(msg) + " - from: " + from);
 	}
 }

@@ -2,11 +2,14 @@ package node.reliable;
 import java.util.HashSet;
 import java.util.Hashtable;
 
+import util.Tuple;
+
+
 
 public class Session {
 	private HashSet<Integer> m_receivedSequence = new HashSet<Integer>();
 	private HashSet<Integer> m_waitingForAck = new HashSet<Integer>();
-	private Hashtable<Integer, byte[]> m_reorderMap = new Hashtable<Integer, byte[]>();
+	private Hashtable<Integer, Tuple<Integer, byte[]>> m_reorderMap = new Hashtable<Integer, Tuple<Integer, byte[]>>();
 	private int m_sendSequenceNumber;
 	private int m_receiveSequenceNumber;
 	
@@ -39,15 +42,19 @@ public class Session {
 	}	
 
 	// Reordering
-	public void addToReceiveQueue(int sequence, byte[] buffer) {
-		this.m_reorderMap.put(sequence, buffer);
+	public void addToReceiveQueue(int sequence, int from, byte[] buffer) {
+		this.m_reorderMap.put(sequence, new Tuple<Integer,byte[]>(from, buffer));
 	}
 	
-	public byte[] getNextReceiveBuffer() {
+	public Tuple<Integer, byte[]> getNextReceiveBuffer() {
 		if (this.m_reorderMap.containsKey(this.m_receiveSequenceNumber)) {
-			byte[] buffer = this.m_reorderMap.get(this.m_receiveSequenceNumber);
+			Tuple<Integer, byte[]> tuple = this.m_reorderMap.get(this.m_receiveSequenceNumber);
+			
+			this.m_reorderMap.remove(this.m_receiveSequenceNumber);
+			
 			this.m_receiveSequenceNumber++;
-			return buffer;
+			
+			return tuple;
 		} else {
 			return null;
 		}
