@@ -1,3 +1,4 @@
+package node.rpc;
 import java.util.Vector;
 
 public class RPCMain {
@@ -11,5 +12,16 @@ public class RPCMain {
 		
 		RPCMethodCall methodCall = RPCNode.parseString(sb);
 		
+		byte[] n = new byte[2];
+		String classStr = n.getClass().toString();
+		System.out.println(classStr);
+		
+		try {
+			Class c = Class.forName("[B");
+			System.out.println(c);
+		} catch (ClassNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
 }
