@@ -64,8 +64,6 @@ public class TransactionMain {
 	public static void main(String[] args) {
 		TransactionMain transMain = new TransactionMain();
 		transMain.executeTests();
-		
-		
 	}
 
 	private void executeTests() {

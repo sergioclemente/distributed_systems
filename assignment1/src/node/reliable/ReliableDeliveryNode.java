@@ -9,10 +9,11 @@ import java.util.*;
 import util.Tuple;
 
 // This class will handle
-// - Duplicates (x): check if already received before processing
-// - At most once (x): set the received before processing
-// - Packet loss (x): Added ack
-// - Reordering: (x): Added reordering
+// - (x) Duplicates: check if already received before processing
+// - (x) At most once: set the received before processing
+// - (x) Packet loss: Added ack
+// - (x) Reordering: Added reordering
+
 public class ReliableDeliveryNode extends Node {
 	private SessionManager m_sessionManager = new SessionManager();
 	private Method m_timeoutMethod;
@@ -106,12 +107,12 @@ public class ReliableDeliveryNode extends Node {
 	}
 	
 	protected static void error(String msg) {
-		// Put some markers in the begining so we can easily distinguish between system messages
+		// Put some markers in the beginning so we can easily distinguish between system messages
 		System.out.println("********* " + msg);
 	}
 	
 	protected static void warn(String msg) {
-		// Put some markers in the begining so we can easily distinguish between system messages
+		// Put some markers in the beginning so we can easily distinguish between system messages
 		System.out.println("********* " + msg);
 	}
 	

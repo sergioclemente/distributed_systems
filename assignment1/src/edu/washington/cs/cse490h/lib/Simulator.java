@@ -182,7 +182,7 @@ public class Simulator extends Manager {
 					try {
 						// Process user input if there is any
 						String input = Replay.getLine();
-
+												
 						if (input != null) {
 							// A command will be converted into an Event.
 							ev = parser.parseLine(input);

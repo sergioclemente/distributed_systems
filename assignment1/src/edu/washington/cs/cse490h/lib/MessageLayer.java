@@ -10,6 +10,7 @@ import plume.OptionGroup;
 
 import edu.washington.cs.cse490h.lib.Manager.FailureLvl;
 
+
 /**
  * <pre>
  * 
@@ -233,7 +234,7 @@ public class MessageLayer {
 
 		try {
 			Manager manager = null;
-
+			
 			Class<? extends Node> nodeImpl = ClassLoader.getSystemClassLoader().loadClass(nodeClass).asSubclass(Node.class);
 
 			if (simulate) {
