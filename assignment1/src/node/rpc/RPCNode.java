@@ -1,13 +1,26 @@
 package node.rpc;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.util.Vector;
 
 import node.reliable.ReliableDeliveryNode;
 
 
+import edu.washington.cs.cse490h.lib.PersistentStorageReader;
+import edu.washington.cs.cse490h.lib.PersistentStorageWriter;
 import edu.washington.cs.cse490h.lib.Utility;
 
 
 public class RPCNode extends ReliableDeliveryNode {	
+	private static final String TEMP_FILE = ".temp";
+	
+	
+	@Override
+	public void start() {
+		recoverFromCrash();
+	}
+	
 	/**
 	 * Classes that override this class should use this method to call a method
 	 * @param targetSender
@@ -81,5 +94,83 @@ public class RPCNode extends ReliableDeliveryNode {
 		methodCall.setParams(v);
 		
 		return methodCall;
+	}
+	
+	/**
+	 * Sub classes will call this method in order to store files on disk. it already takes care of crashes
+	 * @param filename
+	 * @param contents
+	 * @throws IOException 
+	 */
+	protected void replaceFileContents(String filename, String contents) throws IOException {
+		try {
+			// read old file
+			String oldFile = readAllLines(filename);
+			
+			// write old to backup
+			PersistentStorageWriter psw_bck = this.getWriter(".temp", false);
+			psw_bck.write(filename + "\n" + oldFile);
+			psw_bck.close();
+			
+			// update new
+			PersistentStorageWriter psw = this.getWriter(filename, false);
+			psw.write(contents);
+			psw.close();
+			
+			// delete temporary file
+			File f = new File(TEMP_FILE);
+			f.delete();
+		} catch (IOException e) {
+			throw e;
+		}
+	}
+	
+	private void recoverFromCrash() {
+		try {
+			File f = new File(TEMP_FILE);
+			if (f.exists()) {
+				PersistentStorageReader psw_bck = this.getReader(TEMP_FILE);
+				if (!psw_bck.ready()) {
+					f.delete();
+				} else {
+					String filename = psw_bck.readLine();
+					psw_bck.close();
+					
+					String oldContents = readAll(psw_bck);
+					PersistentStorageWriter psw = this.getWriter(filename, false);
+					psw.write(oldContents);
+					psw.close();
+				}
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	// some helpers for transaction
+	private String readAllLines(String filename)  {
+		try {
+			PersistentStorageReader psr = this.getReader(filename);
+			return readAll(psr);
+		} catch (FileNotFoundException e) {
+			return null;
+		}
+		
+	}
+	
+	private String readAll(PersistentStorageReader psr) {
+		StringBuffer sb = new StringBuffer();
+		
+		String line;
+		try {
+			while ((line=psr.readLine()) != null) {
+				sb.append(line);
+				sb.append('\n');
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		
+		return sb.toString();
 	}
 }

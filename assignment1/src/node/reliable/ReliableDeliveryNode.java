@@ -6,8 +6,7 @@ import edu.washington.cs.cse490h.lib.Utility;
 import java.lang.reflect.Method;
 import java.util.*;
 
-import util.Tuple;
-
+import util.ByteManipulator;
 // This class will handle
 // - Duplicates (x): check if already received before processing
 // - At most once (x): set the received before processing
@@ -40,7 +39,7 @@ public class ReliableDeliveryNode extends Node {
 
 	@Override
 	public void onReceive(Integer from, int protocol, byte[] msg) {
-		int sequence = getInt(msg, 0);
+		int sequence = ByteManipulator.getInt(msg, 0);
 		
 		Session session = this.m_sessionManager.getSession(from);
 		
@@ -52,15 +51,11 @@ public class ReliableDeliveryNode extends Node {
 				// At most once semantics. 
 				session.markSequenceAsReceived(sequence);
 
-				session.addToReceiveQueue(sequence, from, msg);
+				session.addToReceiveQueue(new Packet(msg, from));
 				
-				Tuple<Integer, byte[]> tuple;
-				while ( (tuple=session.getNextReceiveBuffer()) != null) {
-					// Remove the sequence number before firing the event
-					byte[] nextMsgTruncated = new byte[tuple.getT2().length - 4];
-					System.arraycopy(tuple.getT2(), 4, nextMsgTruncated, 0, nextMsgTruncated.length);
-					
-					this.onReliableMessageReceived(tuple.getT1(), nextMsgTruncated);
+				Packet packet;
+				while ( (packet=session.getNextReceivePacket()) != null) {					
+					this.onReliableMessageReceived(packet.getFrom(), packet.getBuffer());
 				}
 
 				this.sendAck(from.intValue(), sequence);
@@ -87,21 +82,9 @@ public class ReliableDeliveryNode extends Node {
 		info("Command: " + command);
 	}
 	
-	private void addInt(byte[] buffer, int offset, int value) {
-		buffer[offset] 	   = (byte)(value >>> 24);
-        buffer[offset + 1] = (byte)(value >>> 16);
-        buffer[offset + 2] = (byte)(value >>> 8);
-        buffer[offset + 3] = (byte)value;
-	}
-	
-	private int getInt(byte[] buffer, int offset) {
-		return (buffer[offset] << 24) + ((buffer[offset + 1] & 0xFF) << 16) +
-				+ ((buffer[offset + 2] & 0xFF) << 8) + (buffer[offset + 3] & 0xFF);
-	}
-	
 	private void sendAck(int targetSender, int sequenceNumber) {
 		byte[] buffer = new byte[4];
-		addInt(buffer, 0, sequenceNumber);
+		ByteManipulator.addInt(buffer, 0, sequenceNumber);
 		this.send(targetSender, MESSAGE_TYPE.ACK, buffer);
 	}
 	
@@ -129,7 +112,7 @@ public class ReliableDeliveryNode extends Node {
 		Session session = this.m_sessionManager.getSession(targetSender);
 		
 		byte[] buffer = new byte[msg.length + 4];
-		addInt(buffer, 0, session.getSendSequence());
+		ByteManipulator.addInt(buffer, 0, session.getSendSequence());
 		System.arraycopy(msg, 0, buffer, 4, msg.length);
 		session.addToWaitingForAckList(session.getSendSequence());
 		internalSendPacket(targetSender, session.getSendSequence(), buffer);
