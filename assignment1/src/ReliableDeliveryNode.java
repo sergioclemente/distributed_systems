@@ -38,7 +38,7 @@ public class ReliableDeliveryNode extends Node {
 				byte[] buffer = new byte[msg.length - 4];
 				System.arraycopy(msg, 4, buffer, 0, buffer.length);
 				
-				onMessageReceived(buffer);
+				onMessageReceived(from.intValue(), buffer);
 				// TODO: send ack
 			} else if (protocol == MESSAGE_TYPE.ACK){
 				// TODO: timer, mark as received
@@ -72,6 +72,10 @@ public class ReliableDeliveryNode extends Node {
 	private int getInt(byte[] buffer, int offset) {
 		return (buffer[offset] << 24) + ((buffer[offset + 1] & 0xFF) << 16) +
 				+ ((buffer[offset + 2] & 0xFF) << 8) + (buffer[offset + 3] & 0xFF);
+	}
+	
+	protected static void error(String msg) {
+		System.err.println(msg);
 	}
 	
 	protected static void warn(String msg) {
@@ -116,7 +120,7 @@ public class ReliableDeliveryNode extends Node {
 	 * Method that subclasses will override to handle reliably message received stuff
 	 * @param msg
 	 */
-	protected void onMessageReceived(byte[] msg) {
-		info("Received message " + Utility.byteArrayToString(msg));
+	protected void onMessageReceived(int from, byte[] msg) {
+		info("Received message " + Utility.byteArrayToString(msg) + " from " + from);
 	}
 }
