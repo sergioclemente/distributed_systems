@@ -18,6 +18,8 @@ public class RPCNode extends ReliableDeliveryNode {
 	
 	@Override
 	public void start() {
+		super.start();
+		info("Start RPC called, address=" + this.addr);
 		recoverFromCrash();
 	}
 	

@@ -19,7 +19,7 @@ public class EmulationCommandsParser extends CommandsParser {
 		}
 
 		if (cmd[0].equals("start")) {
-			return Event.getStart(-1);
+			return Event.getStart(-1, 0);
 		}
 
 		return parseCommonCmds(cmd);

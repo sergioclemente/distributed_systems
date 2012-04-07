@@ -8,6 +8,7 @@ import edu.washington.cs.cse490h.lib.Manager.Timeout;
 public class Event {
 	protected int node;
 	protected final EventType t;
+	protected int userData;
 
 	public static enum EventType {
 		FAILURE, START, EXIT, COMMAND, ECHO, TIME, DELIVERY, TIMEOUT
@@ -29,8 +30,9 @@ public class Event {
 		return e;
 	}
 
-	protected static Event getStart(int node) {
+	protected static Event getStart(int node, int nodeTypeIndex) {
 		Event e = new Event(EventType.START);
+		e.userData = nodeTypeIndex;
 		e.node = node;
 		return e;
 	}
@@ -77,7 +79,7 @@ public class Event {
 		case FAILURE:
 			return "FAILURE " + node;
 		case START:
-			return "START " + node;
+			return "START " + node + " " + userData;
 		case EXIT:
 			return "EXIT";
 		case COMMAND:

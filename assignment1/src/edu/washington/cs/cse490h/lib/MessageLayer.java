@@ -3,6 +3,8 @@ package edu.washington.cs.cse490h.lib;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.UnknownHostException;
+import java.util.List;
+import java.util.Vector;
 
 import plume.Option;
 import plume.Options;
@@ -80,7 +82,7 @@ public class MessageLayer {
 	 * Node class to use for simulation\emulation
 	 */
 	@Option(value="-n Node class to use", aliases={"-node-cls"})
-	public static String nodeClass = "";
+	public static List<String> nodeClass = new Vector<String>();
 
 	/**
 	 * Router hostname
@@ -200,7 +202,7 @@ public class MessageLayer {
 			return;
 		}
 
-		if (nodeClass.equals("")) {
+		if (nodeClass.size() == 0) {
 			printError("you must specify a node class with -n.");
 			return;
 		}
@@ -234,7 +236,11 @@ public class MessageLayer {
 		try {
 			Manager manager = null;
 
-			Class<? extends Node> nodeImpl = ClassLoader.getSystemClassLoader().loadClass(nodeClass).asSubclass(Node.class);
+			List<Class<? extends Node>> nodeImplList = new Vector<Class<? extends Node>>();
+			
+			for (String nodeClassString : nodeClass) {
+				nodeImplList.add(ClassLoader.getSystemClassLoader().loadClass(nodeClassString).asSubclass(Node.class));
+			}
 
 			if (simulate) {
 				if(commandFile.equals("")) {
@@ -253,9 +259,9 @@ public class MessageLayer {
 
 				try {
 					if(!commandFile.equals("")){
-						manager = new Simulator(nodeImpl, failureLvl, seed, replayOutputFilename, replayInputFilename, commandFile);
+						manager = new Simulator(nodeImplList, failureLvl, seed, replayOutputFilename, replayInputFilename, commandFile);
 					} else {
-						manager = new Simulator(nodeImpl, failureLvl, seed, replayOutputFilename, replayInputFilename);
+						manager = new Simulator(nodeImplList, failureLvl, seed, replayOutputFilename, replayInputFilename);
 					}
 				} catch (IllegalArgumentException e) {
 					printError("Illegal arguments given to Simulator. Exception: " + e);
@@ -284,10 +290,11 @@ public class MessageLayer {
 				}
 
 				try {
+					// TODO: Emulator not supporting multiple node types
 					if (!commandFile.equals("")) {
-						manager = new Emulator(nodeImpl, routerHostname, routerPort, failureLvl, seed, timestep, replayOutputFilename, replayInputFilename, commandFile);
+						manager = new Emulator(nodeImplList.get(0), routerHostname, routerPort, failureLvl, seed, timestep, replayOutputFilename, replayInputFilename, commandFile);
 					} else {
-						manager = new Emulator(nodeImpl, routerHostname, routerPort, failureLvl, seed, timestep, replayOutputFilename, replayInputFilename);
+						manager = new Emulator(nodeImplList.get(0), routerHostname, routerPort, failureLvl, seed, timestep, replayOutputFilename, replayInputFilename);
 					}
 				} catch(UnknownHostException e) {
 					printError("Router host name is unkown! Exception: " + e);

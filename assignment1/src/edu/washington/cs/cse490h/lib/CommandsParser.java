@@ -196,7 +196,11 @@ public abstract class CommandsParser {
 
 	private Event parseStart(String[] cmd) {
 		if(cmd[0].equals("start")) {
-			return Event.getStart(Integer.parseInt(cmd[1]));
+			int nodeTypeIndex = 0;
+			if (cmd.length == 3) {
+				nodeTypeIndex = Integer.parseInt(cmd[2]);
+			}
+			return Event.getStart(Integer.parseInt(cmd[1]), nodeTypeIndex);
 		}
 		return null;
 	}

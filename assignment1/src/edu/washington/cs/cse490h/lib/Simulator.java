@@ -8,7 +8,9 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Random;
+import java.util.Vector;
 
 import edu.washington.cs.cse490h.lib.Node.NodeCrashException;
 
@@ -32,6 +34,8 @@ public class Simulator extends Manager {
 
 	private HashSet<Timeout> canceledTimeouts;
 
+	private List<Class<? extends Node>> m_nodeImplList;
+	
 	/**
 	 * Base constructor for the Simulator. Does most of the work, but the
 	 * command input method and failure level should be set before calling this
@@ -51,10 +55,13 @@ public class Simulator extends Manager {
 	 * @throws IOException
 	 *             If creating the user input reader fails
 	 */
-	public Simulator(Class<? extends Node> nodeImpl, Long seed, String replayOutputFilename, String replayInputFilename)
+	public Simulator(List<Class<? extends Node>> nodeImplList, Long seed, String replayOutputFilename, String replayInputFilename)
 			throws IllegalArgumentException, IOException {
-		super(nodeImpl, seed, replayOutputFilename, replayInputFilename);
+		// TODO: For now pass the first element
+		super(nodeImplList.get(0), seed, replayOutputFilename, replayInputFilename);
 
+		this.m_nodeImplList = nodeImplList;
+		
 		setParser(new SimulationCommandsParser());
 
 		if (seed == null) {
@@ -96,9 +103,9 @@ public class Simulator extends Manager {
 	 * @throws IOException
 	 *             If creating the user input reader fails
 	 */
-	public Simulator(Class<? extends Node> nodeImpl, FailureLvl failureGen, Long seed, String replayOutputFilename, String replayInputFilename, String commandFile)
+	public Simulator(List<Class<? extends Node>> nodeImplList, FailureLvl failureGen, Long seed, String replayOutputFilename, String replayInputFilename, String commandFile)
 			throws IllegalArgumentException, FileNotFoundException, IOException {
-		this(nodeImpl, seed, replayOutputFilename, replayInputFilename);
+		this(nodeImplList, seed, replayOutputFilename, replayInputFilename);
 
 		cmdInputType = InputType.FILE;
 		userControl = failureGen;
@@ -125,9 +132,9 @@ public class Simulator extends Manager {
 	 * @throws IOException
 	 *             If creating the user input reader fails
 	 */
-	public Simulator(Class<? extends Node> nodeImpl, FailureLvl failureGen, Long seed, String replayOutputFilename, String replayInputFilename)
+	public Simulator(List<Class<? extends Node>> nodeImplList, FailureLvl failureGen, Long seed, String replayOutputFilename, String replayInputFilename)
 			throws IllegalArgumentException , IOException{
-		this(nodeImpl, seed, replayOutputFilename, replayInputFilename);
+		this(nodeImplList, seed, replayOutputFilename, replayInputFilename);
 
 		cmdInputType = InputType.USER;
 		userControl = failureGen;
@@ -260,19 +267,24 @@ public class Simulator extends Manager {
 	 * @param node
 	 *            The address at which to start the node
 	 */
-	private void startNode(int node){
-		if(!validNodeAddress(node)){
+	private void startNode(int node, int nodeTypeIndex){
+		if( (!validNodeAddress(node))){
 			System.err.println("Invalid new node address: " + node);
+			return;
+		}
+		
+		if (nodeTypeIndex >= this.m_nodeImplList.size()) {
+			System.err.println("Invalid node type index: " + nodeTypeIndex);
 			return;
 		}
 
 		if(nodes.containsKey(node)){
 			failNode(node);
 		}
-
+		
 		Node newNode;
 		try{
-			newNode = nodeImpl.newInstance();
+			newNode = this.m_nodeImplList.get(nodeTypeIndex).newInstance();
 		}catch(Exception e){
 			System.err.println("Error while contructing node: " + e);
 			failNode(node);
@@ -512,7 +524,8 @@ public class Simulator extends Manager {
 			for (Integer i : addrCopy) {
 				double rand = Utility.getRNG().nextDouble();
 				if (rand < recoveryRate) {
-					currentRoundEvents.add(Event.getStart(i));
+					// TODO: Assuming node type 0 here
+					currentRoundEvents.add(Event.getStart(i, 0));
 				}
 			}
 		} else {
@@ -538,7 +551,8 @@ public class Simulator extends Manager {
 					if(!input.equals("")){
 						String[] restartList = input.split("\\s+");
 						for(String s: restartList){
-							currentRoundEvents.add(Event.getStart(Integer.parseInt(s)));
+							// TODO: Assuming node type 0 here
+							currentRoundEvents.add(Event.getStart(Integer.parseInt(s), 0));
 						}
 					}
 				}
@@ -645,7 +659,7 @@ public class Simulator extends Manager {
 			failNode(ev.node);
 			break;
 		case START:
-			startNode(ev.node);
+			startNode(ev.node, ev.userData);
 			break;
 		case EXIT:
 			stop();
