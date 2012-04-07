@@ -41,7 +41,7 @@ public class RPCNode extends ReliableDeliveryNode {
 	protected void onReliableMessageReceived(int from, byte[] msg) {
 		StringBuffer sb = new StringBuffer(Utility.byteArrayToString(msg));
 		RPCMethodCall methodCall = parseString(sb);
-		onMethodCalled(methodCall.getMethodName(), methodCall.getParams());
+		onMethodCalled(from, methodCall.getMethodName(), methodCall.getParams());
 	}
 	
 	/**
@@ -49,7 +49,7 @@ public class RPCNode extends ReliableDeliveryNode {
 	 * @param methodName
 	 * @param params
 	 */
-	protected void onMethodCalled (String methodName, Vector<String> params) {
+	protected void onMethodCalled (int from, String methodName, Vector<String> params) {
 		
 	}
 	
