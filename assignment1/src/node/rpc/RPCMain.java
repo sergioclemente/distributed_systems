@@ -12,16 +12,11 @@ public class RPCMain {
 		
 		RPCMethodCall methodCall = RPCNode.parseString(sb);
 		
-		byte[] n = new byte[2];
-		String classStr = n.getClass().toString();
-		System.out.println(classStr);
-		
-		try {
-			Class c = Class.forName("[B");
-			System.out.println(c);
-		} catch (ClassNotFoundException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+		long i1 = 0x12345678;
+		long i2 = 0xdeadb33f;
+		long il = 0x00000000ffffffffL & (long)i1;
+		il = ((0x00000000ffffffffL & (long)i1) << 32L) | (0x00000000ffffffffL & (long)i2);
+		String str = Long.toHexString(il);
+		System.out.println(il);
 	}
 }

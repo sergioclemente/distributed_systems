@@ -46,7 +46,7 @@ public class ReliableDeliveryNode extends Node {
 		if (session.didAlreadyReceiveSequence(sequence)) {
 			info("Already seen sequence number " + sequence);
 			this.sendAck(from.intValue(), sequence);
-			long identifier = from.intValue() << 32 | sequence;
+			long identifier = getPacketIdentifier(from.intValue(), sequence);
 			this.onReliableMessageSent(identifier);
 		} else {
 			if (protocol == MESSAGE_TYPE.NORMAL) {
@@ -120,7 +120,7 @@ public class ReliableDeliveryNode extends Node {
 		session.addToWaitingForAckList(session.getSendSequence());
 		internalSendPacket(targetSender, session.getSendSequence(), buffer);
 		
-		int packetIdentifier = targetSender << 32 | session.getSendSequence();
+		long packetIdentifier = getPacketIdentifier(targetSender, session.getSendSequence());
 		
 		session.incrementSendSequence();
 		
@@ -138,6 +138,11 @@ public class ReliableDeliveryNode extends Node {
 	private void internalSendPacket(int targetSender, int sequenceNumber, byte[] buffer) {
 		this.addTimeout(new Callback(this.m_timeoutMethod, this, new Object[] {targetSender, sequenceNumber, buffer}), TIMEOUT);
 		this.send(targetSender, MESSAGE_TYPE.NORMAL, buffer);
+	}
+	
+	private long getPacketIdentifier(int remoteEndpoint, int sequenceNumber) {
+		return ((0x00000000ffffffffL & (long)remoteEndpoint) << 32L) 
+				| (0x00000000ffffffffL & (long)sequenceNumber);
 	}
 	
 	public void onTimeout(Integer targetSender, Integer sequenceNumber, byte[] buffer) {
