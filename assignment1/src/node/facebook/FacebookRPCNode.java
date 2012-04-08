@@ -57,20 +57,27 @@ public class FacebookRPCNode extends RPCNode {
 	
 	private Hashtable<String, User> m_users = new Hashtable<String, User>();
 	private Hashtable<String, List<User>> m_friends = new Hashtable<String, List<User>>();
+	private Hashtable<String, List<User>> m_friendRequestss = new Hashtable<String, List<User>>();
 	private Hashtable<String, List<Message>> m_messages = new Hashtable<String, List<Message>>();
 	private Hashtable<String, String> m_activeSessions = new Hashtable<String, String>();
 	private Random m_random = new Random();
 	
 	private void createUser(String username, String password) {
-		// TODO: handle duplicate usernames
-		this.appendToLog("CREATE_USER " + username + password);
-		this.m_users.put(username, new User(username, password));
+		if (this.m_users.containsKey(username)) {
+			// TODO: throw error
+		} else {
+			this.appendToLog("create_user " + username + password);
+			this.m_users.put(username, new User(username, password));
+		}
 	}
 	
 	private String login(String username, String password) {
 		if (this.m_users.containsKey(username)) {
-			String token = nextSessionId();
+			//String token = nextSessionId();
+			// todo: just to make testing easier
+			String token = username;
 			this.m_activeSessions.put(token, username);
+			info("User: " + username + " logged in, token: " + token);
 			return token;
 		} else {
 			return "";
@@ -80,21 +87,51 @@ public class FacebookRPCNode extends RPCNode {
 	private void logout(String token) {
 		if (this.m_activeSessions.containsKey(token)) {
 			this.m_activeSessions.remove(token);
+			info("Token: " + token + " logged out");
 		} else {
-			// TODO: error
+			// TODO: throw error
 		}
 	}
 	
 	private void addFriend(String token, String friendLogin) {
 		User user = getUserFromToken(token);
-		this.appendToLog("ADD_FRIEND " + user.getLogin() + " " + friendLogin);
+		this.appendToLog("add_friend " + user.getLogin() + " " + friendLogin);
 		
 		String login = user.getLogin();
 		
 		internalAddFriend(login, friendLogin);
 	}
-
+	
 	private void internalAddFriend(String login, String friendLogin) {
+		List<User> listFriends;
+		if (this.m_friendRequestss.containsKey(login)) {
+			listFriends = this.m_friends.get(login);
+		} else {
+			listFriends = new Vector<User>();
+			this.m_friendRequestss.put(login, listFriends);
+		}
+		// TODO: check for invalid login
+		User friendUser = this.m_users.get(friendLogin);
+		listFriends.add(friendUser);
+		info("User: " + login + " requested to be friends of user " + friendLogin);
+	}
+	
+	private void acceptFriend(String token, String friendLogin) {
+		User user = getUserFromToken(token);
+		this.appendToLog("accept_friend " + user.getLogin() + " " + friendLogin);
+		
+		String login = user.getLogin();
+		
+		internalAcceptFriend(login, friendLogin);
+	}
+	
+	private void internalAcceptFriend(String login, String friendLogin) {
+		addFriendToList(login, friendLogin);
+		addFriendToList(friendLogin, login);
+		info("User: " + login + " accepted to be friends of user " + friendLogin);
+	}
+	
+	private void addFriendToList(String login, String friendLogin) {
 		List<User> listFriends;
 		if (this.m_friends.containsKey(login)) {
 			listFriends = this.m_friends.get(login);
@@ -106,7 +143,7 @@ public class FacebookRPCNode extends RPCNode {
 		User friendUser = this.m_users.get(friendLogin);
 		listFriends.add(friendUser);
 	}
-	
+
 	private User getUserFromToken(String token) {
 		if (this.m_activeSessions.containsKey(token)) {
 			String login = this.m_activeSessions.get(token);
@@ -119,27 +156,25 @@ public class FacebookRPCNode extends RPCNode {
 
 	private void postMessageToAllFriends(String token, String message) {
 		User user = getUserFromToken(token);
-		this.appendToLog("BROADCAST " + user.getLogin() + " " + message);
+		this.appendToLog("write_message_all " + user.getLogin() + " " + message);
 		String login = user.getLogin();
 		internalPostMessageToAllFriends(login, message);
+		
+		info("User: " + login + " posted the following message to all users " + message);
 	}
 	
 	private void internalPostMessageToAllFriends(String login, String message) {
 		if (this.m_friends.containsKey(login)) {
 			List<User> friends = this.m_friends.get(login);
-			
 			Message m = new Message(login, message);
-			
 			for (User friend : friends) {
 				List<Message> messages;
-				
 				if (this.m_messages.containsKey(friend.getLogin())) {
 					messages = this.m_messages.get(friend.getLogin());
 				} else {
 					messages = new Vector<Message>();
 					this.m_messages.put(friend.getLogin(), messages);
 				}
-				
 				messages.add(m);
 			}
 		}
@@ -150,23 +185,19 @@ public class FacebookRPCNode extends RPCNode {
 		String login = user.getLogin();
 		
 		StringBuffer sb = new StringBuffer();
-		
 		if (this.m_messages.containsKey(login)) {
-		
 			List<Message> listOfMessages = this.m_messages.get(login);
-			
 			for (Message message : listOfMessages) {
 				sb.append(message.getMessage());
 				sb.append('\n');
 			}
 		}
-		
 		return sb.toString();
 	}
 	
 	private void appendToLog(String content) {
 		try {
-			this.appendFileContents(FILE_NAME, content);
+			this.appendFileContents(FILE_NAME, content + "\n");
 		} catch (IOException e) {
 			// TODO: return the proper error
 			e.printStackTrace();
@@ -176,15 +207,11 @@ public class FacebookRPCNode extends RPCNode {
 	private String nextSessionId()
 	{
 		StringBuffer sb = new StringBuffer();
-		
 		for (int i = 0 ; i < 10 ; i++) {
 			sb.append(Character.toChars('0' + m_random.nextInt(10)));
 		}
-		
 		return sb.toString();
 	}
-	
-	// todo: accept friend
 	  
 	@Override
 	public void onCommand(String command) {
@@ -201,7 +228,7 @@ public class FacebookRPCNode extends RPCNode {
 		} else if (verb.startsWith("add_friend")) {
 			this.addFriend(parts[1], parts[2]);
 		} else if (verb.startsWith("accept_friend")) {
-			// todo: 
+			this.acceptFriend(parts[1], parts[2]); 
 		} else if (verb.startsWith("write_message_all")) {
 			this.postMessageToAllFriends(parts[1], parts[2]);
 		} else if (verb.startsWith("read_message_all")) {
