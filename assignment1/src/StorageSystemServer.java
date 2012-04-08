@@ -140,7 +140,7 @@ public class StorageSystemServer extends RPCNode {
 		else 
 		{
 			try {
-				replaceFileContents(fileName, contents, false);
+				updateFileContents(fileName, contents, false);
 			} catch (IOException e) {
 			}
 		}		
@@ -161,7 +161,7 @@ public class StorageSystemServer extends RPCNode {
 		else 
 		{
 			try {
-				replaceFileContents(fileName, contents, true);
+				updateFileContents(fileName, contents, true);
 			} catch (IOException e) {
 			}
 		}

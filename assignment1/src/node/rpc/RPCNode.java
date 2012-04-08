@@ -21,7 +21,7 @@ public class RPCNode extends ReliableDeliveryNode {
 	}
 	
 	/**
-	 * Classes that override this class should use this method to call a method
+	 * Classes that override this class should use this method to send a message
 	 * @param targetSender
 	 * @param methodName
 	 * @param params
@@ -101,7 +101,7 @@ public class RPCNode extends ReliableDeliveryNode {
 	 * @param contents
 	 * @throws IOException 
 	 */
-	protected void replaceFileContents(String filename, String contents, boolean append) throws IOException {
+	protected void updateFileContents(String filename, String contents, boolean append) throws IOException {
 		try {
 			// read old file
 			String oldFile = readAllLines(filename);
@@ -119,6 +119,17 @@ public class RPCNode extends ReliableDeliveryNode {
 			// delete temporary file
 			PersistentStorageWriter f = this.getWriter(TEMP_FILE, false);
 			f.delete();
+		} catch (IOException e) {
+			throw e;
+		}
+	}
+	
+	protected void appendFileContents(String filename, String contents) throws IOException {
+		try {
+			// update new
+			PersistentStorageWriter psw = this.getWriter(filename, true);
+			psw.write(contents);
+			psw.close();
 		} catch (IOException e) {
 			throw e;
 		}
