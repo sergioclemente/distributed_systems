@@ -1,16 +1,13 @@
 package node.rpc;
-import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Vector;
 
 import node.reliable.ReliableDeliveryNode;
 
-
 import edu.washington.cs.cse490h.lib.PersistentStorageReader;
 import edu.washington.cs.cse490h.lib.PersistentStorageWriter;
 import edu.washington.cs.cse490h.lib.Utility;
-
 
 public class RPCNode extends ReliableDeliveryNode {	
 	private static final String TEMP_FILE = ".temp";
@@ -104,7 +101,7 @@ public class RPCNode extends ReliableDeliveryNode {
 	 * @param contents
 	 * @throws IOException 
 	 */
-	protected void replaceFileContents(String filename, String contents) throws IOException {
+	protected void replaceFileContents(String filename, String contents, boolean append) throws IOException {
 		try {
 			// read old file
 			String oldFile = readAllLines(filename);
@@ -115,12 +112,12 @@ public class RPCNode extends ReliableDeliveryNode {
 			psw_bck.close();
 			
 			// update new
-			PersistentStorageWriter psw = this.getWriter(filename, false);
+			PersistentStorageWriter psw = this.getWriter(filename, append);
 			psw.write(contents);
 			psw.close();
 			
 			// delete temporary file
-			File f = new File(TEMP_FILE);
+			PersistentStorageWriter f = this.getWriter(TEMP_FILE, false);
 			f.delete();
 		} catch (IOException e) {
 			throw e;
@@ -129,10 +126,10 @@ public class RPCNode extends ReliableDeliveryNode {
 	
 	private void recoverFromCrash() {
 		try {
-			File f = new File(TEMP_FILE);
-			if (f.exists()) {
+			if (Utility.fileExists(this, TEMP_FILE)) {
 				PersistentStorageReader psw_bck = this.getReader(TEMP_FILE);
 				if (!psw_bck.ready()) {
+					PersistentStorageWriter f = this.getWriter(TEMP_FILE, false);
 					f.delete();
 				} else {
 					String filename = psw_bck.readLine();

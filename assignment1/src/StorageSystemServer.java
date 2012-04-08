@@ -2,8 +2,6 @@
 
 
 import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.LinkedList;
@@ -12,8 +10,8 @@ import java.util.Queue;
 import java.util.Vector;
 
 import node.rpc.RPCNode;
-
-import edu.washington.cs.cse490h.lib.Callback;
+import edu.washington.cs.cse490h.lib.PersistentStorageWriter;
+import edu.washington.cs.cse490h.lib.Utility;
 
 public class StorageSystemServer extends RPCNode {
 	
@@ -24,15 +22,19 @@ public class StorageSystemServer extends RPCNode {
 	private static final int FILE_ALREADY_EXISTS = 11;
 	private static final int FILE_TOO_LARGE = 30;
 	
-	private static final int timer = 10;
-	
 	private Queue<String> _commandQueue;
 	
+	/**
+	 * Constructor.
+	 */
 	public StorageSystemServer()
 	{
 		_commandQueue = new LinkedList<String>();
 	}
 	
+	/**
+	 * Parses the commands sent to the client by the simulator or the emulator.
+	 */
 	@Override
 	public void onCommand(String command)
 	{
@@ -64,23 +66,24 @@ public class StorageSystemServer extends RPCNode {
 		}
 	}	
 	
-	//TODO-Livar: Not sure this is the way to create the file. Theoretically we should use some API provided by them, but I don't see one for File.
 	public void createFile (int from, String fileName)
-	{
-		File newFile = new File(fileName);
-		
+	{		
 		Vector<String> params = new Vector<String>();
 		
-		try 
+		if (Utility.fileExists(this, fileName))
+		{				
+			params.add("error");
+			params.add(String.format(ERROR_MESSAGE_FORMAT, "create", this.addr, fileName, FILE_ALREADY_EXISTS));								
+		}
+		else
 		{
-			if (!newFile.createNewFile())
-			{				
-				params.add("error");
-				params.add(String.format(ERROR_MESSAGE_FORMAT, "create", this.addr, fileName, FILE_ALREADY_EXISTS));								
+			try 
+			{			
+					this.getWriter(fileName, false);
+			} 
+			catch (IOException e) 
+			{
 			}
-		} 
-		catch (IOException e) 
-		{
 		}
 		
 		callMethod(from, "endCommand", params);
@@ -90,32 +93,35 @@ public class StorageSystemServer extends RPCNode {
 	{
 		Vector<String> params = new Vector<String>();
 		
-		try
+		if (!Utility.fileExists(this, fileName))
 		{
-			BufferedReader bufferedReader = this.getReader(fileName);
-			
-			StringBuffer contents = new StringBuffer();
-			
-			String line = bufferedReader.readLine();  
-			while (line != null)
-			{
-				contents.append(line);
-				
-				line = bufferedReader.readLine();
-			}
-			
-			bufferedReader.close();
-			
-			params.add(contents.toString());			
-		}
-		catch (FileNotFoundException fnfe)
-		{			
 			params.add("error");
-			params.add(String.format(ERROR_MESSAGE_FORMAT, "get", this.addr, fileName, FILE_DOES_NOT_EXIST));						
-		} 
-		catch (IOException e) 
+			params.add(String.format(ERROR_MESSAGE_FORMAT, "get", this.addr, fileName, FILE_DOES_NOT_EXIST));
+		}
+		else
 		{
-			//TODO-Livar: How to deal with this? Same goes for other methods.
+			try
+			{
+				BufferedReader bufferedReader = this.getReader(fileName);
+				
+				StringBuffer contents = new StringBuffer();
+				
+				String line = bufferedReader.readLine();  
+				while (line != null)
+				{
+					contents.append(line);
+					
+					line = bufferedReader.readLine();
+				}
+				
+				bufferedReader.close();
+				
+				params.add(contents.toString());			
+			}
+			catch (IOException e) 
+			{
+				//TODO-Livar: How to deal with this? Same goes for other methods.
+			}
 		}
 		
 		callMethod(from, "endGetFile", params);
@@ -126,21 +132,18 @@ public class StorageSystemServer extends RPCNode {
 	{
 		Vector<String> params = new Vector<String>();
 		
-		try {
-			BufferedWriter bufferedWriter = this.getWriter(fileName, false);
-			
-			bufferedWriter.write(contents);
-			
-			bufferedWriter.close();
-		} 
-		catch (FileNotFoundException e) 
+		if (!Utility.fileExists(this, fileName))
 		{
 			params.add("error");
 			params.add(String.format(ERROR_MESSAGE_FORMAT, "put", this.addr, fileName, FILE_DOES_NOT_EXIST));
-		} 
-		catch (IOException e) 
-		{
 		}
+		else 
+		{
+			try {
+				replaceFileContents(fileName, contents, false);
+			} catch (IOException e) {
+			}
+		}		
 		
 		callMethod(from, "endCommand", params);
 	}
@@ -150,39 +153,40 @@ public class StorageSystemServer extends RPCNode {
 	{
 		Vector<String> params = new Vector<String>();
 		
-		try {
-			BufferedWriter bufferedWriter = this.getWriter(fileName, true);
-			
-			bufferedWriter.write(contents);
-			
-			bufferedWriter.close();
-		} 
-		catch (FileNotFoundException e) 
+		if (!Utility.fileExists(this, fileName))
 		{
 			params.add("error");
 			params.add(String.format(ERROR_MESSAGE_FORMAT, "append", this.addr, fileName, FILE_DOES_NOT_EXIST));
-		} 
-		catch (IOException e) 
+		}
+		else 
 		{
+			try {
+				replaceFileContents(fileName, contents, true);
+			} catch (IOException e) {
+			}
 		}
 		
 		callMethod(from, "endCommand", params);
 	}
 
-	//TODO-Livar: Not sure this is the way to delete the file. Theoretically we should use some API provided by them, but I don't see one for File.
 	public void deleteFile(int from, String fileName)
 	{
 		Vector<String> params = new Vector<String>();
 		
-		File file = new File(fileName);
-		
-		if (!file.exists())
+		if (!Utility.fileExists(this, fileName))
 		{
 			params.add("error");
 			params.add(String.format(ERROR_MESSAGE_FORMAT, "delete", this.addr, fileName, FILE_DOES_NOT_EXIST));
 		}
-		
-		file.delete();
+		else 
+		{
+			try {
+				PersistentStorageWriter writer = this.getWriter(fileName, false);
+				
+				writer.delete();
+			} catch (IOException e) {
+			}
+		}
 		
 		callMethod(from, "endCommand", params);
 	}
@@ -193,9 +197,7 @@ public class StorageSystemServer extends RPCNode {
 		
 		params.add(fileName);
 		
-		callMethod(targetSender, "create", params);
-		
-		addTimeout("create");		
+		callMethod(targetSender, "create", params);		
 	}
 	
 	public void beginGetFile(int targetSender, String fileName) 
@@ -205,8 +207,6 @@ public class StorageSystemServer extends RPCNode {
 		params.add(fileName);
 		
 		callMethod(targetSender, "get", params);
-		
-		addTimeout("get");		
 	}
 	
 	public void beginPutFile(int targetSender, String fileName, String contents) 
@@ -217,8 +217,6 @@ public class StorageSystemServer extends RPCNode {
 		params.add(contents);
 		
 		callMethod(targetSender, "put", params);
-		
-		addTimeout("put");		
 	}
 	
 	public void beginAppendFile(int targetSender, String fileName, String contents) 
@@ -229,8 +227,6 @@ public class StorageSystemServer extends RPCNode {
 		params.add(contents);
 		
 		callMethod(targetSender, "append", params);
-		
-		addTimeout("append");		
 	}
 	
 	public void beginDeleteFile(int targetSender, String fileName) 
@@ -239,34 +235,16 @@ public class StorageSystemServer extends RPCNode {
 		
 		params.add(fileName);
 		
-		callMethod(targetSender, "delete", params);
-		
-		addTimeout("delete");		
+		callMethod(targetSender, "delete", params);		
 	}
 	
-	public void timeout(Vector<String> params)
+	@Override
+	protected void onConnectionAborted(int endpoint)
 	{
 		// prints error
+		error(String.format("NODE %1: The connection to %2 timedout.", addr, endpoint));
 		
 		endCommand();
-	}
-	
-	/**
-	 * Wraps the creation of the callback and calls addTimeout on the base class.
-	 * 
-	 * @param command - name of the command that will appear in the error message in the case of a time out.
-	 */
-	private void addTimeout(String command)
-	{
-		try {
-			Callback callback = new Callback(this.getClass().getMethod("timeout"), this, new Object[] { command });
-			
-			addTimeout(callback, timer);
-		} catch (SecurityException e) {
-			e.printStackTrace();
-		} catch (NoSuchMethodException e) {
-			e.printStackTrace();
-		}
 	}	
 	
 	/**
