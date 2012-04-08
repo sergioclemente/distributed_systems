@@ -46,6 +46,8 @@ public class ReliableDeliveryNode extends Node {
 		if (session.didAlreadyReceiveSequence(sequence)) {
 			info("Already seen sequence number " + sequence);
 			this.sendAck(from.intValue(), sequence);
+			long identifier = from.intValue() << 32 | sequence;
+			this.onReliableMessageSent(identifier);
 		} else {
 			if (protocol == MESSAGE_TYPE.NORMAL) {
 				// At most once semantics. 
@@ -107,8 +109,9 @@ public class ReliableDeliveryNode extends Node {
 	 * Methods that subclasses will call to reliably send a message
 	 * @param targetSender
 	 * @param msg
+	 * @return an identifier that can be used in the onReliableMessageSent to know when the packet was acknowledged 
 	 */
-	protected void sendReliableMessage(int targetSender, byte[] msg) {
+	protected long sendReliableMessage(int targetSender, byte[] msg) {
 		Session session = this.m_sessionManager.getSession(targetSender);
 		
 		byte[] buffer = new byte[msg.length + 4];
@@ -116,7 +119,12 @@ public class ReliableDeliveryNode extends Node {
 		System.arraycopy(msg, 0, buffer, 4, msg.length);
 		session.addToWaitingForAckList(session.getSendSequence());
 		internalSendPacket(targetSender, session.getSendSequence(), buffer);
+		
+		int packetIdentifier = targetSender << 32 | session.getSendSequence();
+		
 		session.incrementSendSequence();
+		
+		return packetIdentifier;
 	}
 	
 	/**
@@ -140,6 +148,14 @@ public class ReliableDeliveryNode extends Node {
 			info("Resending packet " + sequenceNumber);
 			this.internalSendPacket(targetSender, sequenceNumber, buffer);			
 		}
+	}
+	
+	/**
+	 * This method is called when a packet that was waiting 
+	 * @param identifier
+	 */
+	protected void onReliableMessageSent(long identifier) {
+		
 	}
 	
 	/**
