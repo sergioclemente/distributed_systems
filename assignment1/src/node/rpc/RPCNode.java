@@ -26,11 +26,11 @@ public class RPCNode extends ReliableDeliveryNode {
 	/**
 	 * Classes that override this class should use this method to send a message
 	 * @param targetSender
-	 * @param messageName
+	 * @param methodName
 	 * @param params
 	 */
-	protected void sendMessage(int targetSender, String messageName, Vector<String> params) {
-		RPCMethodCall methodCall = new RPCMethodCall(messageName, params);
+	protected void callMethod(int targetSender, String methodName, Vector<String> params) {
+		RPCMethodCall methodCall = new RPCMethodCall(methodName, params);
 		
 		StringBuffer sb = serialize(methodCall);
 		
