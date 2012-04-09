@@ -41,7 +41,6 @@ public class RPCNode extends ReliableDeliveryNode {
 	@Override
 	public void start() {
 		super.start();
-		info("Start RPC called, address=" + this.addr);
 		recoverFromCrash();
 	}
 	
@@ -82,12 +81,14 @@ public class RPCNode extends ReliableDeliveryNode {
 		sb.append(methodCall.getMethodName());
 		sb.append(" ");
 		
-		for	(int i = 0; i < methodCall.getParams().size(); i++) {
-			String paramStr = methodCall.getParams().get(i).toString();
-			sb.append(paramStr.length());
-			sb.append(" ");
-			sb.append(paramStr);
-			sb.append(" ");
+		if (methodCall.getParams() != null) {
+			for	(int i = 0; i < methodCall.getParams().size(); i++) {
+				String paramStr = methodCall.getParams().get(i).toString();
+				sb.append(paramStr.length());
+				sb.append(" ");
+				sb.append(paramStr);
+				sb.append(" ");
+			}	
 		}
 		return sb;
 	}

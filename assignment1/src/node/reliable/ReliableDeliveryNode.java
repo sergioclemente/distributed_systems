@@ -43,13 +43,15 @@ public class ReliableDeliveryNode extends Node {
 		
 		Session session = this.m_sessionManager.getSession(from);
 		
-		if (session.didAlreadyReceiveSequence(sequence)) {
-			info("Already seen sequence number " + sequence);
-			this.sendAck(from.intValue(), sequence);
-			long identifier = getPacketIdentifier(from.intValue(), sequence);
-			this.onReliableMessageSent(identifier);
-		} else {
-			if (protocol == MESSAGE_TYPE.NORMAL) {
+		if (protocol == MESSAGE_TYPE.NORMAL) {
+			if (session.didAlreadyReceiveSequence(sequence)) {
+				info("RemoteEndpoint:" + from + " - Already seen sequence number " + sequence);
+				this.sendAck(from.intValue(), sequence);
+				long identifier = getPacketIdentifier(from.intValue(), sequence);
+				this.onReliableMessageSent(identifier);
+			} else {
+				info("RemoteEndpoint:" + from + " - Adding to receive queue packet with sequence " + sequence);
+				
 				// At most once semantics. 
 				session.markSequenceAsReceived(sequence);
 
@@ -60,13 +62,13 @@ public class ReliableDeliveryNode extends Node {
 					this.onReliableMessageReceived(packet.getFrom(), packet.getBuffer());
 				}
 
-				this.sendAck(from.intValue(), sequence);
-			} else if (protocol == MESSAGE_TYPE.ACK){
-				info("Received ack for sequence number " + sequence);
-				session.removeFromWaitingForAckList(sequence);
-			} else {
-				// TODO: throw exception!
+				this.sendAck(from.intValue(), sequence);	
 			}
+		} else if (protocol == MESSAGE_TYPE.ACK){
+			info("RemoteEndpoint:" + from + " - Received ack for packet with sequence " + sequence);
+			session.removeFromWaitingForAckList(sequence);
+		} else {
+			// TODO: throw exception!
 		}
 	}
 
@@ -88,6 +90,7 @@ public class ReliableDeliveryNode extends Node {
 		byte[] buffer = new byte[4];
 		ByteManipulator.addInt(buffer, 0, sequenceNumber);
 		this.send(targetSender, MESSAGE_TYPE.ACK, buffer);
+		info("RemoteEndpoint:" + targetSender + " - Sending ack for sequence number " + sequenceNumber);
 	}
 	
 	protected static void error(String msg) {
@@ -95,14 +98,14 @@ public class ReliableDeliveryNode extends Node {
 		System.out.println("********* " + msg);
 	}
 	
-	protected static void warn(String msg) {
+	protected void warn(String msg) {
 		// Put some markers in the begining so we can easily distinguish between system messages
-		System.out.println("********* " + msg);
+		System.out.println("********* From:" + this.addr + " - " + msg);
 	}
 	
-	protected static void info(String msg) {
+	protected void info(String msg) {
 		// Put some markers in the begining so we can easily distinguish between system messages
-		System.out.println("********* " + msg);
+		System.out.println("********* From:" + this.addr + " - " + msg);
 	}
 	
 	/**
@@ -150,7 +153,7 @@ public class ReliableDeliveryNode extends Node {
 		
 		// Resent the packet if we didn't receive the ack yet
 		if (session.containsInWaitinfForAckList(sequenceNumber.intValue())) {
-			info("Resending packet " + sequenceNumber);
+			info("RemoteEndpoint:" + targetSender + " - resending packet " + sequenceNumber.intValue());
 			this.internalSendPacket(targetSender, sequenceNumber, buffer);			
 		}
 	}
@@ -168,6 +171,6 @@ public class ReliableDeliveryNode extends Node {
 	 * @param msg
 	 */
 	protected void onReliableMessageReceived(int from, byte[] msg) {
-		info("Received message: - " + Utility.byteArrayToString(msg) + " - from: " + from);
+		info("RemoteEndpoint:" + from + " - received message " + Utility.byteArrayToString(msg));
 	}
 }

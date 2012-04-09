@@ -62,6 +62,10 @@ public class FacebookRPCNode extends RPCNode {
 	private Hashtable<String, String> m_activeSessions = new Hashtable<String, String>();
 	private Random m_random = new Random();
 	
+	
+
+	
+	
 	private void createUser(String username, String password) {
 		if (this.m_users.containsKey(username)) {
 			// TODO: throw error
@@ -154,7 +158,7 @@ public class FacebookRPCNode extends RPCNode {
 		}
 	}
 
-	private void postMessageToAllFriends(String token, String message) {
+	private void writeMessagesAll(String token, String message) {
 		User user = getUserFromToken(token);
 		this.appendToLog("write_message_all " + user.getLogin() + " " + message);
 		String login = user.getLogin();
@@ -180,7 +184,7 @@ public class FacebookRPCNode extends RPCNode {
 		}
 	}
 
-	private String readAllMessages(String token) {
+	private String readMessagesAll(String token) {
 		User user = getUserFromToken(token);
 		String login = user.getLogin();
 		
@@ -230,9 +234,45 @@ public class FacebookRPCNode extends RPCNode {
 		} else if (verb.startsWith("accept_friend")) {
 			this.acceptFriend(parts[1], parts[2]); 
 		} else if (verb.startsWith("write_message_all")) {
-			this.postMessageToAllFriends(parts[1], parts[2]);
+			this.writeMessagesAll(parts[1], parts[2]);
 		} else if (verb.startsWith("read_message_all")) {
-			System.out.println(this.readAllMessages(parts[1]));
+			System.out.println(this.readMessagesAll(parts[1]));
 		}
+	}
+	
+	@Override
+	protected void onMethodCalled (int from, String methodName, Vector<String> params) {
+		Vector<String> returnParams = new Vector();
+		String returnMethodName = "status_call";
+		
+		try {
+			String returnValue = null;
+			
+			if (methodName == "create_user") {
+				this.createUser(params.get(0), params.get(1));
+			} else if (methodName == "login") {
+				returnValue = this.login(params.get(0), params.get(1));
+			} else if (methodName == "logout") {
+				this.logout(params.get(0));
+			} else if (methodName == "add_friend") {
+				this.addFriend(params.get(0), params.get(1));
+			} else if (methodName == "accept_friend") {
+				this.acceptFriend(params.get(0), params.get(1));
+			} else if (methodName == "write_message_all") {
+				this.writeMessagesAll(params.get(0), params.get(1));
+			} else if (methodName == "read_message_all"){
+				returnValue = this.readMessagesAll(params.get(0));
+			}
+			
+			returnParams.add("ok");
+			if (returnValue != null) {
+				returnParams.add(returnValue);
+			}
+		} catch (Exception e) {
+			returnParams.add("error");
+			returnParams.add(e.getMessage());
+		}
+		
+		this.callMethod(from, returnMethodName, returnParams);
 	}
 }
