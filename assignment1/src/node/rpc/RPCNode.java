@@ -1,6 +1,8 @@
 package node.rpc;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.LinkedList;
+import java.util.Queue;
 import java.util.Vector;
 
 import node.reliable.ReliableDeliveryNode;
@@ -12,6 +14,29 @@ import edu.washington.cs.cse490h.lib.Utility;
 public class RPCNode extends ReliableDeliveryNode {	
 	private static final String TEMP_FILE = ".temp";
 	
+	private Queue<String> _commandQueue;
+	
+	public RPCNode()
+	{
+		_commandQueue = new LinkedList<String>();
+	}
+	
+	/**
+	 * Parses the commands sent to the client by the simulator or the emulator.
+	 */
+	@Override
+	public void onCommand(String command)
+	{
+		// If this is the server, it doesn't handle onCommand.
+		if (isServer()) return;
+		
+		_commandQueue.add(command);
+		
+		if (_commandQueue.size() == 1)
+		{
+			executeClientCommand(command);
+		}								
+	}
 	
 	@Override
 	public void start() {
@@ -93,6 +118,38 @@ public class RPCNode extends ReliableDeliveryNode {
 		methodCall.setParams(v);
 		
 		return methodCall;
+	}
+	
+	/**
+	 * Removes the current command from the queue and executes the next command, if there is one.
+	 */
+	protected void endCommand()
+	{
+		// Removes the head
+		_commandQueue.remove();
+		
+		// Gets the next element in the queue (new head) and executes it
+		String command = _commandQueue.peek();		
+		if (command != null)
+		{
+			executeClientCommand(command);
+		}
+	}
+	
+	protected void executeClientCommand(String command)
+	{
+		
+	}
+	
+	/**
+	 * Because the framework doesn't allow us to have two different types running at the same time, we need to implement
+	 * both client and server together.
+	 * 
+	 * To differentiate between one and another, we are assuming that the server has a addr = 0.
+	 */
+	protected boolean isServer()
+	{
+		return addr == 0;
 	}
 	
 	/**
@@ -182,5 +239,5 @@ public class RPCNode extends ReliableDeliveryNode {
 		}
 		
 		return sb.toString();
-	}
+	}	
 }

@@ -2,11 +2,8 @@
 
 
 import java.io.BufferedReader;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.LinkedList;
 import java.util.ListIterator;
-import java.util.Queue;
 import java.util.Vector;
 
 import node.rpc.RPCNode;
@@ -20,34 +17,7 @@ public class StorageSystemServer extends RPCNode {
 	
 	private static final int FILE_DOES_NOT_EXIST = 10;	
 	private static final int FILE_ALREADY_EXISTS = 11;
-	private static final int FILE_TOO_LARGE = 30;
-	
-	private Queue<String> _commandQueue;
-	
-	/**
-	 * Constructor.
-	 */
-	public StorageSystemServer()
-	{
-		_commandQueue = new LinkedList<String>();
-	}
-	
-	/**
-	 * Parses the commands sent to the client by the simulator or the emulator.
-	 */
-	@Override
-	public void onCommand(String command)
-	{
-		// If this is the server, it doesn't handle onCommand.
-		if (isServer()) return;
-		
-		_commandQueue.add(command);
-		
-		if (_commandQueue.size() == 1)
-		{
-			executeClientCommand(command);
-		}								
-	}
+	private static final int FILE_TOO_LARGE = 30;			
 	
 	/**
 	 * Verifies the name of the method called and calls the appropriate method in this class. If more parameters than
@@ -248,11 +218,12 @@ public class StorageSystemServer extends RPCNode {
 	}	
 	
 	/**
-	 * Actually executes command received through onCommand.
+	 * Parses the command received by onCommand and actually executes it.
 	 * 
 	 * @param command - the command to be executed.
 	 */
-	private void executeClientCommand(String command)
+	@Override
+	protected void executeClientCommand(String command)
 	{
 		String[] parts = command.split("\\s+");
 		
@@ -380,32 +351,5 @@ public class StorageSystemServer extends RPCNode {
 		
 		// Will remove this command from the queue and executes the next one, if any
 		endCommand();
-	}
-	
-	/**
-	 * Removes the current command from the queue and executes the next command, if there is one.
-	 */
-	private void endCommand()
-	{
-		// Removes the head
-		_commandQueue.remove();
-		
-		// Gets the next element in the queue (new head) and executes it
-		String command = _commandQueue.peek();		
-		if (command != null)
-		{
-			executeClientCommand(command);
-		}
-	}
-	
-	/**
-	 * Because the framework doesn't allow us to have two different types running at the same time, we need to implement
-	 * both client and server together.
-	 * 
-	 * To differentiate between one and another, we are assuming that the server has a addr = 0.
-	 */
-	private boolean isServer()
-	{
-		return addr == 0;
-	}
+	}	
 }
