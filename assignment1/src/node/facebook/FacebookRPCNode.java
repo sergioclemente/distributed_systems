@@ -66,16 +66,16 @@ public class FacebookRPCNode extends RPCNode {
 
 	
 	
-	private void createUser(String username, String password) {
+	private void createUser(String username, String password) throws Exception {
 		if (this.m_users.containsKey(username)) {
-			// TODO: throw error
+			throw new Exception("User already exists");
 		} else {
 			this.appendToLog("create_user " + username + password);
 			this.m_users.put(username, new User(username, password));
 		}
 	}
 	
-	private String login(String username, String password) {
+	private String login(String username, String password) throws Exception {
 		if (this.m_users.containsKey(username)) {
 			//String token = nextSessionId();
 			// todo: just to make testing easier
@@ -84,20 +84,20 @@ public class FacebookRPCNode extends RPCNode {
 			info("User: " + username + " logged in, token: " + token);
 			return token;
 		} else {
-			return "";
+			throw new Exception("User don't exist");
 		}
 	}
 	
-	private void logout(String token) {
+	private void logout(String token) throws Exception {
 		if (this.m_activeSessions.containsKey(token)) {
 			this.m_activeSessions.remove(token);
 			info("Token: " + token + " logged out");
 		} else {
-			// TODO: throw error
+			throw new Exception("Session don't exist");
 		}
 	}
 	
-	private void addFriend(String token, String friendLogin) {
+	private void addFriend(String token, String friendLogin) throws Exception {
 		User user = getUserFromToken(token);
 		this.appendToLog("add_friend " + user.getLogin() + " " + friendLogin);
 		
@@ -106,7 +106,7 @@ public class FacebookRPCNode extends RPCNode {
 		internalAddFriend(login, friendLogin);
 	}
 	
-	private void internalAddFriend(String login, String friendLogin) {
+	private void internalAddFriend(String login, String friendLogin) throws Exception {
 		List<User> listFriends;
 		if (this.m_friendRequestss.containsKey(login)) {
 			listFriends = this.m_friends.get(login);
@@ -114,13 +114,15 @@ public class FacebookRPCNode extends RPCNode {
 			listFriends = new Vector<User>();
 			this.m_friendRequestss.put(login, listFriends);
 		}
-		// TODO: check for invalid login
+		if (!this.m_users.containsKey(friendLogin)) {
+			throw new Exception("Friend login don't exist");
+		}
 		User friendUser = this.m_users.get(friendLogin);
 		listFriends.add(friendUser);
 		info("User: " + login + " requested to be friends of user " + friendLogin);
 	}
 	
-	private void acceptFriend(String token, String friendLogin) {
+	private void acceptFriend(String token, String friendLogin) throws Exception {
 		User user = getUserFromToken(token);
 		this.appendToLog("accept_friend " + user.getLogin() + " " + friendLogin);
 		
@@ -129,13 +131,13 @@ public class FacebookRPCNode extends RPCNode {
 		internalAcceptFriend(login, friendLogin);
 	}
 	
-	private void internalAcceptFriend(String login, String friendLogin) {
+	private void internalAcceptFriend(String login, String friendLogin) throws Exception {
 		addFriendToList(login, friendLogin);
 		addFriendToList(friendLogin, login);
 		info("User: " + login + " accepted to be friends of user " + friendLogin);
 	}
 	
-	private void addFriendToList(String login, String friendLogin) {
+	private void addFriendToList(String login, String friendLogin) throws Exception {
 		List<User> listFriends;
 		if (this.m_friends.containsKey(login)) {
 			listFriends = this.m_friends.get(login);
@@ -143,22 +145,23 @@ public class FacebookRPCNode extends RPCNode {
 			listFriends = new Vector<User>();
 			this.m_friends.put(login, listFriends);
 		}
-		// TODO: check for invalid login
+		if (!this.m_users.containsKey(friendLogin)) {
+			throw new Exception("Friend login don't exist");
+		}
 		User friendUser = this.m_users.get(friendLogin);
 		listFriends.add(friendUser);
 	}
 
-	private User getUserFromToken(String token) {
+	private User getUserFromToken(String token) throws Exception {
 		if (this.m_activeSessions.containsKey(token)) {
 			String login = this.m_activeSessions.get(token);
 			return this.m_users.get(login);
 		} else {
-			// todo: error handling
-			return null;
+			throw new Exception("Session don't exist");
 		}
 	}
 
-	private void writeMessagesAll(String token, String message) {
+	private void writeMessagesAll(String token, String message) throws Exception {
 		User user = getUserFromToken(token);
 		this.appendToLog("write_message_all " + user.getLogin() + " " + message);
 		String login = user.getLogin();
@@ -184,7 +187,7 @@ public class FacebookRPCNode extends RPCNode {
 		}
 	}
 
-	private String readMessagesAll(String token) {
+	private String readMessagesAll(String token) throws Exception {
 		User user = getUserFromToken(token);
 		String login = user.getLogin();
 		
@@ -219,24 +222,28 @@ public class FacebookRPCNode extends RPCNode {
 	  
 	@Override
 	public void onCommand(String command) {
-		String[] parts = command.split("\\s+");
-		
-		String verb = parts[0];
-		
-		if (verb.startsWith("create_user")) {
-			this.createUser(parts[1], parts[2]);
-		} else if (verb.startsWith("login")) {
-			System.out.println(this.login(parts[1], parts[2]));
-		} else if (verb.startsWith("logout")) {
-			this.logout(parts[1]);
-		} else if (verb.startsWith("add_friend")) {
-			this.addFriend(parts[1], parts[2]);
-		} else if (verb.startsWith("accept_friend")) {
-			this.acceptFriend(parts[1], parts[2]); 
-		} else if (verb.startsWith("write_message_all")) {
-			this.writeMessagesAll(parts[1], parts[2]);
-		} else if (verb.startsWith("read_message_all")) {
-			System.out.println(this.readMessagesAll(parts[1]));
+		try	{
+			String[] parts = command.split("\\s+");
+			
+			String verb = parts[0];
+			
+			if (verb.startsWith("create_user")) {
+				this.createUser(parts[1], parts[2]);
+			} else if (verb.startsWith("login")) {
+				System.out.println(this.login(parts[1], parts[2]));
+			} else if (verb.startsWith("logout")) {
+				this.logout(parts[1]);
+			} else if (verb.startsWith("add_friend")) {
+				this.addFriend(parts[1], parts[2]);
+			} else if (verb.startsWith("accept_friend")) {
+				this.acceptFriend(parts[1], parts[2]); 
+			} else if (verb.startsWith("write_message_all")) {
+				this.writeMessagesAll(parts[1], parts[2]);
+			} else if (verb.startsWith("read_message_all")) {
+				System.out.println(this.readMessagesAll(parts[1]));
+			}
+		} catch (Exception ex) {
+			error(ex.getMessage());
 		}
 	}
 	
@@ -248,20 +255,22 @@ public class FacebookRPCNode extends RPCNode {
 		try {
 			String returnValue = null;
 			
-			if (methodName == "create_user") {
+			if (methodName.startsWith("create_user")) {
 				this.createUser(params.get(0), params.get(1));
-			} else if (methodName == "login") {
+			} else if (methodName.startsWith("login")) {
 				returnValue = this.login(params.get(0), params.get(1));
-			} else if (methodName == "logout") {
+			} else if (methodName.startsWith("logout")) {
 				this.logout(params.get(0));
-			} else if (methodName == "add_friend") {
+			} else if (methodName.startsWith("add_friend")) {
 				this.addFriend(params.get(0), params.get(1));
-			} else if (methodName == "accept_friend") {
+			} else if (methodName.startsWith("accept_friend")) {
 				this.acceptFriend(params.get(0), params.get(1));
-			} else if (methodName == "write_message_all") {
+			} else if (methodName.startsWith("write_message_all")) {
 				this.writeMessagesAll(params.get(0), params.get(1));
-			} else if (methodName == "read_message_all"){
+			} else if (methodName.startsWith("read_message_all")){
 				returnValue = this.readMessagesAll(params.get(0));
+			} else {
+				throw new Exception("invalid operation");
 			}
 			
 			returnParams.add("ok");

@@ -357,8 +357,12 @@ public class Simulator extends Manager {
 			}
 		}else{
 			try{
-				System.out.println("Crash node " + n.addr + " before " + description + "? (y/n)");
-				String input = m_prompt ? Replay.getLine().trim() : "";
+				String input = "";
+				if (m_prompt) {
+					System.out.println("Crash node " + n.addr + " before " + description + "? (y/n)");
+					input = Replay.getLine().trim();
+				}
+
 				if (input.length() != 0 && input.charAt(0) == 'y') {
 					NodeCrashException e = failNode(n.addr);
 					// This function is called by Node, so we need to rethrow
@@ -432,8 +436,11 @@ public class Simulator extends Manager {
 			}
 
 			try{
-				System.out.println("Which should be dropped? (space delimited list or just press enter to drop none)");
-				String input = m_prompt ? Replay.getLine().trim() : "";
+				String input = "";
+				if (m_prompt) {
+					System.out.println("Which should be dropped? (space delimited list or just press enter to drop none)");
+					input = Replay.getLine().trim();
+				}
 				// hash set so we don't have to deal with duplicates
 				HashSet<Packet> toBeRemoved = new HashSet<Packet>();
 
@@ -454,8 +461,11 @@ public class Simulator extends Manager {
 				// If user drops and delays the same packet, result is undefined
 				//   In current implementation, delay takes precedence
 				if(userControl.compareTo(FailureLvl.DELAY) >= 0){		// userControl >= DELAY
-					System.out.println("Which should be delayed? (space delimited list or just press enter to delay none)");
-					input = m_prompt ? Replay.getLine().trim() : "";
+					input = "";
+					if (m_prompt) {
+						System.out.println("Which should be delayed? (space delimited list or just press enter to delay none)");
+						input = Replay.getLine().trim();
+					}
 
 					if(!input.equals("")){
 						String[] delayList = input.split("\\s+");
@@ -534,8 +544,11 @@ public class Simulator extends Manager {
 				String input;
 
 				if (!nodes.isEmpty()) {
-					System.out.println("Crash which nodes? (space-delimited list of addresses or just press enter)");
-					input = m_prompt ? Replay.getLine().trim() : "";
+					input = "";
+					if (m_prompt) {
+						System.out.println("Crash which nodes? (space-delimited list of addresses or just press enter)");
+						input = Replay.getLine().trim();
+					}
 					if(!input.equals("")){
 						String[] crashList = input.split("\\s+");
 						for(String s: crashList){
@@ -546,8 +559,11 @@ public class Simulator extends Manager {
 
 				// The user could also just use the start command, but not if the input method is file
 				if(!crashedNodes.isEmpty()){
-					System.out.println("Restart which nodes? (space-delimited list of addresses or just press enter)");
-					input = m_prompt ? Replay.getLine().trim() : "";
+					input = "";
+					if (m_prompt) {
+						System.out.println("Restart which nodes? (space-delimited list of addresses or just press enter)");
+						input = Replay.getLine().trim();
+					}
 					if(!input.equals("")){
 						String[] restartList = input.split("\\s+");
 						for(String s: restartList){
@@ -602,8 +618,11 @@ public class Simulator extends Manager {
 					for(int i = 0; i < currentRoundEvents.size(); ++i){
 						System.out.println(i + ": " + currentRoundEvents.get(i).toString());
 					}
-					System.out.println("In what order should the events happen? (enter for in-order)");
-					String input = m_prompt ? Replay.getLine().trim() : "";
+					String input = "";
+					if (m_prompt) {
+						System.out.println("In what order should the events happen? (enter for in-order)");
+						input =  Replay.getLine().trim();
+					}
 
 					if(input.equals("")){
 						// enter for in-order
