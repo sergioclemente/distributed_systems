@@ -2,6 +2,7 @@
 
 
 import java.io.BufferedReader;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ListIterator;
 import java.util.Vector;
@@ -17,7 +18,10 @@ public class StorageSystemServer extends RPCNode {
 	
 	private static final int FILE_DOES_NOT_EXIST = 10;	
 	private static final int FILE_ALREADY_EXISTS = 11;
-	private static final int FILE_TOO_LARGE = 30;			
+	private static final int FILE_TOO_LARGE = 30;		
+	private static final int IO_EXCEPTION = 40;
+	
+	private static final int MAX_MESSAGE_SIZE = 1500;
 	
 	/**
 	 * Verifies the name of the method called and calls the appropriate method in this class. If more parameters than
@@ -53,6 +57,8 @@ public class StorageSystemServer extends RPCNode {
 			} 
 			catch (IOException e) 
 			{
+				params.add("error");
+				params.add(String.format(ERROR_MESSAGE_FORMAT, "create", this.addr, fileName, IO_EXCEPTION));
 			}
 		}
 		
@@ -72,32 +78,20 @@ public class StorageSystemServer extends RPCNode {
 		{
 			try
 			{
-				BufferedReader bufferedReader = this.getReader(fileName);
-				
-				StringBuffer contents = new StringBuffer();
-				
-				String line = bufferedReader.readLine();  
-				while (line != null)
-				{
-					contents.append(line);
-					
-					line = bufferedReader.readLine();
-				}
-				
-				bufferedReader.close();
+				String contents = readFileContents(fileName);
 				
 				params.add(contents.toString());			
 			}
 			catch (IOException e) 
 			{
-				//TODO-Livar: How to deal with this? Same goes for other methods.
+				params.add("error");
+				params.add(String.format(ERROR_MESSAGE_FORMAT, "get", this.addr, fileName, IO_EXCEPTION));
 			}
 		}
 		
 		callMethod(from, "endGetFile", params);
-	}
+	}	
 	
-	//TODO-livar: verify that the file size doesn't exceed the length of the message minus the headers
 	public void putFile(int from, String fileName, String contents)
 	{
 		Vector<String> params = new Vector<String>();
@@ -107,33 +101,46 @@ public class StorageSystemServer extends RPCNode {
 			params.add("error");
 			params.add(String.format(ERROR_MESSAGE_FORMAT, "put", this.addr, fileName, FILE_DOES_NOT_EXIST));
 		}
+		else if (contents.getBytes().length > MAX_MESSAGE_SIZE)
+		{
+			params.add("error");
+			params.add(String.format(ERROR_MESSAGE_FORMAT, "put", this.addr, fileName, FILE_TOO_LARGE));
+		}
 		else 
 		{
 			try {
 				updateFileContents(fileName, contents, false);
 			} catch (IOException e) {
+				params.add("error");
+				params.add(String.format(ERROR_MESSAGE_FORMAT, "put", this.addr, fileName, IO_EXCEPTION));
 			}
 		}		
 		
 		callMethod(from, "endCommand", params);
 	}
 	
-	//TODO-livar: verify that the file size doesn't exceed the length of the message minus the headers
 	public void appendToFile(int from, String fileName, String contents)
 	{
 		Vector<String> params = new Vector<String>();
 		
-		if (!Utility.fileExists(this, fileName))
-		{
-			params.add("error");
-			params.add(String.format(ERROR_MESSAGE_FORMAT, "append", this.addr, fileName, FILE_DOES_NOT_EXIST));
-		}
-		else 
-		{
-			try {
-				updateFileContents(fileName, contents, true);
-			} catch (IOException e) {
+		try {						
+			if (!Utility.fileExists(this, fileName))
+			{
+				params.add("error");
+				params.add(String.format(ERROR_MESSAGE_FORMAT, "append", this.addr, fileName, FILE_DOES_NOT_EXIST));
 			}
+			else if (readFileContents(fileName).getBytes().length > MAX_MESSAGE_SIZE)
+			{
+				params.add("error");
+				params.add(String.format(ERROR_MESSAGE_FORMAT, "append", this.addr, fileName, FILE_TOO_LARGE));
+			}
+			else 
+			{			
+					updateFileContents(fileName, contents, true);			
+			}
+		} catch (IOException e) {
+			params.add("error");
+			params.add(String.format(ERROR_MESSAGE_FORMAT, "append", this.addr, fileName, IO_EXCEPTION));
 		}
 		
 		callMethod(from, "endCommand", params);
@@ -155,6 +162,8 @@ public class StorageSystemServer extends RPCNode {
 				
 				writer.delete();
 			} catch (IOException e) {
+				params.add("error");
+				params.add(String.format(ERROR_MESSAGE_FORMAT, "delete", this.addr, fileName, IO_EXCEPTION));
 			}
 		}
 		
@@ -256,6 +265,13 @@ public class StorageSystemServer extends RPCNode {
 					contents.append(parts[i]);
 				}
 				
+				int contentsSize = contents.toString().getBytes().length;
+				
+				if (contentsSize > MAX_MESSAGE_SIZE)
+				{
+					error(String.format("Trying to send information about the max message size. Max size: %d, Actual size: %d", 
+							MAX_MESSAGE_SIZE, contentsSize));
+				}
 				if (commandName.equals("put"))
 				{
 					beginPutFile(targetSender, fileName, contents.toString());
@@ -351,5 +367,23 @@ public class StorageSystemServer extends RPCNode {
 		
 		// Will remove this command from the queue and executes the next one, if any
 		endCommand();
-	}	
+	}
+	
+	private String readFileContents(String fileName)
+			throws FileNotFoundException, IOException {
+		BufferedReader bufferedReader = this.getReader(fileName);
+		
+		StringBuffer contents = new StringBuffer();
+		
+		String line = bufferedReader.readLine();  
+		while (line != null)
+		{
+			contents.append(line);
+			
+			line = bufferedReader.readLine();
+		}
+		
+		bufferedReader.close();
+		return contents.toString();
+	}
 }
