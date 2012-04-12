@@ -13,7 +13,7 @@ import edu.washington.cs.cse490h.lib.Utility;
 public class StorageSystemServer extends RPCNode {
 	
 	private static final String ERROR_MESSAGE_FORMAT = 
-			"Error: %1 on server %2 and file %3 returned error code %4";
+			"Error: %s on server %d and file %s returned error code %s";
 	
 	private static final int FILE_DOES_NOT_EXIST = 10;	
 	private static final int FILE_ALREADY_EXISTS = 11;
@@ -342,7 +342,7 @@ public class StorageSystemServer extends RPCNode {
 	{
 		if (params.size() == 2 && params.get(0).equals("error"))
 		{
-			error(String.format("NODE %1: %2", addr, params.get(1)));
+			error(String.format("NODE %d: %s", addr, params.get(1)));
 		}		
 		else if (methodName.equals("endGetFile"))
 		{

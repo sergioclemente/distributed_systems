@@ -38,7 +38,11 @@ public class PersistentStorageReader extends BufferedReader {
 	@Override
 	public String readLine() throws IOException {
 		String ret = super.readLine();
-		n.handleDiskReadEvent("readline: " + Utility.logEscape(ret));
+		if (ret != null)
+		{
+			n.handleDiskReadEvent("readline: " + Utility.logEscape(ret));
+		}
+		
 		return ret;
 	}
 }
