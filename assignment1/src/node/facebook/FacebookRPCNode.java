@@ -1,287 +1,98 @@
 package node.facebook;
 
-import java.io.IOException;
-import java.util.Hashtable;
-import java.util.List;
-import java.util.Random;
 import java.util.Vector;
 
 import node.rpc.RPCNode;
 
-public class FacebookRPCNode extends RPCNode {
-	private class User {
-		public User(String login, String password) {
-			super();
-			this.m_login = login;
-			this.m_password = password;
-		}
-		public String getLogin() {
-			return m_login;
-		}
-		public void setLogin(String name) {
-			this.m_login = name;
-		}
-		public String getPassword() {
-			return m_password;
-		}
-		public void setPassword(String password) {
-			this.m_password = password;
-		}
-		
-		private String m_login;
-		private String m_password;
-	}
-	private class Message {
-		public Message(String fromLogin, String message) {
-			super();
-			this.m_fromLogin = fromLogin;
-			this.m_message = message;
-		}
-		public String getFromLogin() {
-			return m_fromLogin;
-		}
-		public void setFromLogin(String fromLogin) {
-			this.m_fromLogin = fromLogin;
-		}
-		public String getMessage() {
-			return m_message;
-		}
-		public void setMessage(String message) {
-			this.m_message = message;
-		}
-		private String m_fromLogin;
-		private String m_message;
-	}
+public class FacebookRPCNode extends RPCNode implements INode {
+	private FacebookSystem m_system;
+	private static final String ERROR_MESSAGE_FORMAT = 
+			"Error: %s on facebook server %d. Returned error code was %s";
 	
-	private static final String FILE_NAME = "facebookdb.txt";
-	
-	private Hashtable<String, User> m_users = new Hashtable<String, User>();
-	private Hashtable<String, List<User>> m_friends = new Hashtable<String, List<User>>();
-	private Hashtable<String, List<User>> m_friendRequestss = new Hashtable<String, List<User>>();
-	private Hashtable<String, List<Message>> m_messages = new Hashtable<String, List<Message>>();
-	private Hashtable<String, String> m_activeSessions = new Hashtable<String, String>();
-	private Random m_random = new Random();
-	
-	
-
-	
-	
-	private void createUser(String username, String password) throws Exception {
-		if (this.m_users.containsKey(username)) {
-			throw new Exception("User already exists");
-		} else {
-			this.appendToLog("create_user " + username + password);
-			this.m_users.put(username, new User(username, password));
+	public FacebookRPCNode() {
+		if (this.isServer()) {
+			this.m_system = new FacebookSystem(this);
 		}
 	}
-	
-	private String login(String username, String password) throws Exception {
-		if (this.m_users.containsKey(username)) {
-			//String token = nextSessionId();
-			// todo: just to make testing easier
-			String token = username;
-			this.m_activeSessions.put(token, username);
-			info("User: " + username + " logged in, token: " + token);
-			return token;
-		} else {
-			throw new Exception("User don't exist");
-		}
-	}
-	
-	private void logout(String token) throws Exception {
-		if (this.m_activeSessions.containsKey(token)) {
-			this.m_activeSessions.remove(token);
-			info("Token: " + token + " logged out");
-		} else {
-			throw new Exception("Session don't exist");
-		}
-	}
-	
-	private void addFriend(String token, String friendLogin) throws Exception {
-		User user = getUserFromToken(token);
-		this.appendToLog("add_friend " + user.getLogin() + " " + friendLogin);
-		
-		String login = user.getLogin();
-		
-		internalAddFriend(login, friendLogin);
-	}
-	
-	private void internalAddFriend(String login, String friendLogin) throws Exception {
-		List<User> listFriends;
-		if (this.m_friendRequestss.containsKey(login)) {
-			listFriends = this.m_friends.get(login);
-		} else {
-			listFriends = new Vector<User>();
-			this.m_friendRequestss.put(login, listFriends);
-		}
-		if (!this.m_users.containsKey(friendLogin)) {
-			throw new Exception("Friend login don't exist");
-		}
-		User friendUser = this.m_users.get(friendLogin);
-		listFriends.add(friendUser);
-		info("User: " + login + " requested to be friends of user " + friendLogin);
-	}
-	
-	private void acceptFriend(String token, String friendLogin) throws Exception {
-		User user = getUserFromToken(token);
-		this.appendToLog("accept_friend " + user.getLogin() + " " + friendLogin);
-		
-		String login = user.getLogin();
-		
-		internalAcceptFriend(login, friendLogin);
-	}
-	
-	private void internalAcceptFriend(String login, String friendLogin) throws Exception {
-		addFriendToList(login, friendLogin);
-		addFriendToList(friendLogin, login);
-		info("User: " + login + " accepted to be friends of user " + friendLogin);
-	}
-	
-	private void addFriendToList(String login, String friendLogin) throws Exception {
-		List<User> listFriends;
-		if (this.m_friends.containsKey(login)) {
-			listFriends = this.m_friends.get(login);
-		} else {
-			listFriends = new Vector<User>();
-			this.m_friends.put(login, listFriends);
-		}
-		if (!this.m_users.containsKey(friendLogin)) {
-			throw new Exception("Friend login don't exist");
-		}
-		User friendUser = this.m_users.get(friendLogin);
-		listFriends.add(friendUser);
-	}
-
-	private User getUserFromToken(String token) throws Exception {
-		if (this.m_activeSessions.containsKey(token)) {
-			String login = this.m_activeSessions.get(token);
-			return this.m_users.get(login);
-		} else {
-			throw new Exception("Session don't exist");
-		}
-	}
-
-	private void writeMessagesAll(String token, String message) throws Exception {
-		User user = getUserFromToken(token);
-		this.appendToLog("write_message_all " + user.getLogin() + " " + message);
-		String login = user.getLogin();
-		internalPostMessageToAllFriends(login, message);
-		
-		info("User: " + login + " posted the following message to all users " + message);
-	}
-	
-	private void internalPostMessageToAllFriends(String login, String message) {
-		if (this.m_friends.containsKey(login)) {
-			List<User> friends = this.m_friends.get(login);
-			Message m = new Message(login, message);
-			for (User friend : friends) {
-				List<Message> messages;
-				if (this.m_messages.containsKey(friend.getLogin())) {
-					messages = this.m_messages.get(friend.getLogin());
-				} else {
-					messages = new Vector<Message>();
-					this.m_messages.put(friend.getLogin(), messages);
-				}
-				messages.add(m);
-			}
-		}
-	}
-
-	private String readMessagesAll(String token) throws Exception {
-		User user = getUserFromToken(token);
-		String login = user.getLogin();
-		
-		StringBuffer sb = new StringBuffer();
-		if (this.m_messages.containsKey(login)) {
-			List<Message> listOfMessages = this.m_messages.get(login);
-			for (Message message : listOfMessages) {
-				sb.append(message.getMessage());
-				sb.append('\n');
-			}
-		}
-		return sb.toString();
-	}
-	
-	private void appendToLog(String content) {
-		try {
-			this.appendFileContents(FILE_NAME, content + "\n");
-		} catch (IOException e) {
-			// TODO: return the proper error
-			e.printStackTrace();
-		}
-	}
-
-	private String nextSessionId()
-	{
-		StringBuffer sb = new StringBuffer();
-		for (int i = 0 ; i < 10 ; i++) {
-			sb.append(Character.toChars('0' + m_random.nextInt(10)));
-		}
-		return sb.toString();
-	}
-	  
-	@Override
-	public void onCommand(String command) {
-		try	{
-			String[] parts = command.split("\\s+");
-			
-			String verb = parts[0];
-			
-			if (verb.startsWith("create_user")) {
-				this.createUser(parts[1], parts[2]);
-			} else if (verb.startsWith("login")) {
-				System.out.println(this.login(parts[1], parts[2]));
-			} else if (verb.startsWith("logout")) {
-				this.logout(parts[1]);
-			} else if (verb.startsWith("add_friend")) {
-				this.addFriend(parts[1], parts[2]);
-			} else if (verb.startsWith("accept_friend")) {
-				this.acceptFriend(parts[1], parts[2]); 
-			} else if (verb.startsWith("write_message_all")) {
-				this.writeMessagesAll(parts[1], parts[2]);
-			} else if (verb.startsWith("read_message_all")) {
-				System.out.println(this.readMessagesAll(parts[1]));
-			}
-		} catch (Exception ex) {
-			error(ex.getMessage());
-		}
-	}
-	
+	 
 	@Override
 	protected void onMethodCalled (int from, String methodName, Vector<String> params) {
-		Vector<String> returnParams = new Vector();
+		if (isServer())
+		{
+			executeServerCommand(from, methodName, params);
+		}
+		else
+		{
+			endClientCommand(from, methodName, params);
+		}
+	}
+	
+	// Server part due to limitation of the framework
+	private void executeServerCommand(int from, String methodName,
+			Vector<String> params) {
+		Vector<String> returnParams = new Vector<String>();
 		String returnMethodName = "status_call";
 		
 		try {
 			String returnValue = null;
 			
 			if (methodName.startsWith("create_user")) {
-				this.createUser(params.get(0), params.get(1));
+				this.m_system.createUser(params.get(0), params.get(1));
 			} else if (methodName.startsWith("login")) {
-				returnValue = this.login(params.get(0), params.get(1));
+				returnValue = this.m_system.login(params.get(0), params.get(1));
 			} else if (methodName.startsWith("logout")) {
-				this.logout(params.get(0));
+				this.m_system.logout(params.get(0));
 			} else if (methodName.startsWith("add_friend")) {
-				this.addFriend(params.get(0), params.get(1));
+				this.m_system.addFriend(params.get(0), params.get(1));
 			} else if (methodName.startsWith("accept_friend")) {
-				this.acceptFriend(params.get(0), params.get(1));
+				this.m_system.acceptFriend(params.get(0), params.get(1));
 			} else if (methodName.startsWith("write_message_all")) {
-				this.writeMessagesAll(params.get(0), params.get(1));
+				this.m_system.writeMessagesAll(params.get(0), params.get(1));
 			} else if (methodName.startsWith("read_message_all")){
-				returnValue = this.readMessagesAll(params.get(0));
+				returnValue = this.m_system.readMessagesAll(params.get(0));
 			} else {
-				throw new Exception("invalid operation");
+				throw new FacebookException(FacebookException.INVALID_FACEBOOK_METHOD);
 			}
 			
 			returnParams.add("ok");
 			if (returnValue != null) {
 				returnParams.add(returnValue);
 			}
-		} catch (Exception e) {
+		} catch (FacebookException e) {
 			returnParams.add("error");
-			returnParams.add(e.getMessage());
+			returnParams.add(String.format(ERROR_MESSAGE_FORMAT, methodName, this.addr, e.getExceptionCode()));
 		}
 		
-		this.callMethod(from, returnMethodName, returnParams);
+		this.callMethod(from, returnMethodName, returnParams);		
+	}
+
+
+	// Client part due to limitation of the framework
+	@Override
+	protected void executeClientCommand(String command)
+	{
+		String[] parts = command.split("\\s+");
+		
+		String verb = parts[0];
+		
+		Vector<String> params = new Vector<String>();
+		for (int i = 1; i < parts.length; i++) {
+			params.add(parts[i]);
+		}
+		
+		this.callMethod(0, verb, params);
+	}
+	
+	private void endClientCommand(int from, String methodName, Vector<String> params)
+	{
+		if (params.size() == 2 && params.get(0).equals("error"))
+		{
+			error(String.format("NODE %d: %s", this.addr, params.get(1)));
+		} else if (params.size() == 2 && params.get(0).equals("ok")) {
+			info("Server returned: " + params.get(1));
+		}
+		
+		// Will remove this command from the queue and executes the next one, if any
+		endCommand();
 	}
 }

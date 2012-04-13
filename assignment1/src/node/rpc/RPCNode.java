@@ -159,7 +159,7 @@ public class RPCNode extends ReliableDeliveryNode {
 	 * @param contents
 	 * @throws IOException 
 	 */
-	protected void updateFileContents(String filename, String contents, boolean append) throws IOException {
+	public void updateFileContents(String filename, String contents, boolean append) throws IOException {
 		try {
 			// read old file
 			String oldFile = readAllLines(filename);
@@ -182,7 +182,7 @@ public class RPCNode extends ReliableDeliveryNode {
 		}
 	}
 	
-	protected void appendFileContents(String filename, String contents) throws IOException {
+	public void appendFileContents(String filename, String contents) throws IOException {
 		try {
 			// update new
 			PersistentStorageWriter psw = this.getWriter(filename, true);
