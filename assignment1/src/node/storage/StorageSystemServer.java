@@ -1,51 +1,28 @@
+package node.storage;
 
 
 
 import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.LinkedList;
 import java.util.ListIterator;
-import java.util.Queue;
 import java.util.Vector;
 
 import node.rpc.RPCNode;
-
-import edu.washington.cs.cse490h.lib.Callback;
+import edu.washington.cs.cse490h.lib.PersistentStorageWriter;
+import edu.washington.cs.cse490h.lib.Utility;
 
 public class StorageSystemServer extends RPCNode {
 	
 	private static final String ERROR_MESSAGE_FORMAT = 
-			"Error: %1 on server %2 and file %3 returned error code %4";
+			"Error: %s on server %d and file %s returned error code %s";
 	
 	private static final int FILE_DOES_NOT_EXIST = 10;	
 	private static final int FILE_ALREADY_EXISTS = 11;
-	private static final int FILE_TOO_LARGE = 30;
+	private static final int FILE_TOO_LARGE = 30;		
+	private static final int IO_EXCEPTION = 40;
 	
-	private static final int timer = 10;
-	
-	private Queue<String> _commandQueue;
-	
-	public StorageSystemServer()
-	{
-		_commandQueue = new LinkedList<String>();
-	}
-	
-	@Override
-	public void onCommand(String command)
-	{
-		// If this is the server, it doesn't handle onCommand.
-		if (isServer()) return;
-		
-		_commandQueue.add(command);
-		
-		if (_commandQueue.size() == 1)
-		{
-			executeClientCommand(command);
-		}								
-	}
+	private static final int MAX_MESSAGE_SIZE = 1500;
 	
 	/**
 	 * Verifies the name of the method called and calls the appropriate method in this class. If more parameters than
@@ -64,23 +41,26 @@ public class StorageSystemServer extends RPCNode {
 		}
 	}	
 	
-	//TODO-Livar: Not sure this is the way to create the file. Theoretically we should use some API provided by them, but I don't see one for File.
 	public void createFile (int from, String fileName)
-	{
-		File newFile = new File(fileName);
-		
+	{		
 		Vector<String> params = new Vector<String>();
 		
-		try 
+		if (Utility.fileExists(this, fileName))
+		{				
+			params.add("error");
+			params.add(String.format(ERROR_MESSAGE_FORMAT, "create", this.addr, fileName, FILE_ALREADY_EXISTS));								
+		}
+		else
 		{
-			if (!newFile.createNewFile())
-			{				
+			try 
+			{			
+					this.getWriter(fileName, false);
+			} 
+			catch (IOException e) 
+			{
 				params.add("error");
-				params.add(String.format(ERROR_MESSAGE_FORMAT, "create", this.addr, fileName, FILE_ALREADY_EXISTS));								
+				params.add(String.format(ERROR_MESSAGE_FORMAT, "create", this.addr, fileName, IO_EXCEPTION));
 			}
-		} 
-		catch (IOException e) 
-		{
 		}
 		
 		callMethod(from, "endCommand", params);
@@ -90,99 +70,103 @@ public class StorageSystemServer extends RPCNode {
 	{
 		Vector<String> params = new Vector<String>();
 		
-		try
+		if (!Utility.fileExists(this, fileName))
 		{
-			BufferedReader bufferedReader = this.getReader(fileName);
-			
-			StringBuffer contents = new StringBuffer();
-			
-			String line = bufferedReader.readLine();  
-			while (line != null)
-			{
-				contents.append(line);
-				
-				line = bufferedReader.readLine();
-			}
-			
-			bufferedReader.close();
-			
-			params.add(contents.toString());			
-		}
-		catch (FileNotFoundException fnfe)
-		{			
 			params.add("error");
-			params.add(String.format(ERROR_MESSAGE_FORMAT, "get", this.addr, fileName, FILE_DOES_NOT_EXIST));						
-		} 
-		catch (IOException e) 
+			params.add(String.format(ERROR_MESSAGE_FORMAT, "get", this.addr, fileName, FILE_DOES_NOT_EXIST));
+		}
+		else
 		{
-			//TODO-Livar: How to deal with this? Same goes for other methods.
+			try
+			{
+				String contents = readFileContents(fileName);
+				
+				params.add(contents.toString());			
+			}
+			catch (IOException e) 
+			{
+				params.add("error");
+				params.add(String.format(ERROR_MESSAGE_FORMAT, "get", this.addr, fileName, IO_EXCEPTION));
+			}
 		}
 		
 		callMethod(from, "endGetFile", params);
-	}
+	}	
 	
-	//TODO-livar: verify that the file size doesn't exceed the length of the message minus the headers
 	public void putFile(int from, String fileName, String contents)
 	{
 		Vector<String> params = new Vector<String>();
 		
-		try {
-			BufferedWriter bufferedWriter = this.getWriter(fileName, false);
-			
-			bufferedWriter.write(contents);
-			
-			bufferedWriter.close();
-		} 
-		catch (FileNotFoundException e) 
+		if (!Utility.fileExists(this, fileName))
 		{
 			params.add("error");
 			params.add(String.format(ERROR_MESSAGE_FORMAT, "put", this.addr, fileName, FILE_DOES_NOT_EXIST));
-		} 
-		catch (IOException e) 
-		{
 		}
+		else if (contents.getBytes().length > MAX_MESSAGE_SIZE)
+		{
+			params.add("error");
+			params.add(String.format(ERROR_MESSAGE_FORMAT, "put", this.addr, fileName, FILE_TOO_LARGE));
+		}
+		else 
+		{
+			try {
+				updateFileContents(fileName, contents, false);
+			} catch (IOException e) {
+				params.add("error");
+				params.add(String.format(ERROR_MESSAGE_FORMAT, "put", this.addr, fileName, IO_EXCEPTION));
+			}
+		}		
 		
 		callMethod(from, "endCommand", params);
 	}
 	
-	//TODO-livar: verify that the file size doesn't exceed the length of the message minus the headers
 	public void appendToFile(int from, String fileName, String contents)
 	{
 		Vector<String> params = new Vector<String>();
 		
-		try {
-			BufferedWriter bufferedWriter = this.getWriter(fileName, true);
-			
-			bufferedWriter.write(contents);
-			
-			bufferedWriter.close();
-		} 
-		catch (FileNotFoundException e) 
-		{
+		try {						
+			if (!Utility.fileExists(this, fileName))
+			{
+				params.add("error");
+				params.add(String.format(ERROR_MESSAGE_FORMAT, "append", this.addr, fileName, FILE_DOES_NOT_EXIST));
+			}
+			else if (readFileContents(fileName).getBytes().length > MAX_MESSAGE_SIZE)
+			{
+				params.add("error");
+				params.add(String.format(ERROR_MESSAGE_FORMAT, "append", this.addr, fileName, FILE_TOO_LARGE));
+			}
+			else 
+			{			
+					updateFileContents(fileName, contents, true);			
+			}
+		} catch (IOException e) {
 			params.add("error");
-			params.add(String.format(ERROR_MESSAGE_FORMAT, "append", this.addr, fileName, FILE_DOES_NOT_EXIST));
-		} 
-		catch (IOException e) 
-		{
+			params.add(String.format(ERROR_MESSAGE_FORMAT, "append", this.addr, fileName, IO_EXCEPTION));
 		}
 		
 		callMethod(from, "endCommand", params);
 	}
 
-	//TODO-Livar: Not sure this is the way to delete the file. Theoretically we should use some API provided by them, but I don't see one for File.
 	public void deleteFile(int from, String fileName)
 	{
 		Vector<String> params = new Vector<String>();
 		
-		File file = new File(fileName);
-		
-		if (!file.exists())
+		if (!Utility.fileExists(this, fileName))
 		{
 			params.add("error");
 			params.add(String.format(ERROR_MESSAGE_FORMAT, "delete", this.addr, fileName, FILE_DOES_NOT_EXIST));
 		}
-		
-		file.delete();
+		else 
+		{
+			try {
+				PersistentStorageWriter writer = this.getWriter(fileName, false);
+				
+				writer.delete();
+			} catch (IOException e) {
+				params.add("error");
+				params.add(String.format(ERROR_MESSAGE_FORMAT, "delete", this.addr, fileName, IO_EXCEPTION));
+			}
+		}
 		
 		callMethod(from, "endCommand", params);
 	}
@@ -193,9 +177,7 @@ public class StorageSystemServer extends RPCNode {
 		
 		params.add(fileName);
 		
-		callMethod(targetSender, "create", params);
-		
-		addTimeout("create");		
+		callMethod(targetSender, "create", params);		
 	}
 	
 	public void beginGetFile(int targetSender, String fileName) 
@@ -205,8 +187,6 @@ public class StorageSystemServer extends RPCNode {
 		params.add(fileName);
 		
 		callMethod(targetSender, "get", params);
-		
-		addTimeout("get");		
 	}
 	
 	public void beginPutFile(int targetSender, String fileName, String contents) 
@@ -217,8 +197,6 @@ public class StorageSystemServer extends RPCNode {
 		params.add(contents);
 		
 		callMethod(targetSender, "put", params);
-		
-		addTimeout("put");		
 	}
 	
 	public void beginAppendFile(int targetSender, String fileName, String contents) 
@@ -229,8 +207,6 @@ public class StorageSystemServer extends RPCNode {
 		params.add(contents);
 		
 		callMethod(targetSender, "append", params);
-		
-		addTimeout("append");		
 	}
 	
 	public void beginDeleteFile(int targetSender, String fileName) 
@@ -239,42 +215,25 @@ public class StorageSystemServer extends RPCNode {
 		
 		params.add(fileName);
 		
-		callMethod(targetSender, "delete", params);
-		
-		addTimeout("delete");		
+		callMethod(targetSender, "delete", params);		
 	}
 	
-	public void timeout(Vector<String> params)
+	@Override
+	protected void onConnectionAborted(int endpoint)
 	{
 		// prints error
+		error(String.format("NODE %1: The connection to %2 timedout.", addr, endpoint));
 		
 		endCommand();
-	}
-	
-	/**
-	 * Wraps the creation of the callback and calls addTimeout on the base class.
-	 * 
-	 * @param command - name of the command that will appear in the error message in the case of a time out.
-	 */
-	private void addTimeout(String command)
-	{
-		try {
-			Callback callback = new Callback(this.getClass().getMethod("timeout"), this, new Object[] { command });
-			
-			addTimeout(callback, timer);
-		} catch (SecurityException e) {
-			e.printStackTrace();
-		} catch (NoSuchMethodException e) {
-			e.printStackTrace();
-		}
 	}	
 	
 	/**
-	 * Actually executes command received through onCommand.
+	 * Parses the command received by onCommand and actually executes it.
 	 * 
 	 * @param command - the command to be executed.
 	 */
-	private void executeClientCommand(String command)
+	@Override
+	protected void executeClientCommand(String command)
 	{
 		String[] parts = command.split("\\s+");
 		
@@ -307,6 +266,13 @@ public class StorageSystemServer extends RPCNode {
 					contents.append(parts[i]);
 				}
 				
+				int contentsSize = contents.toString().getBytes().length;
+				
+				if (contentsSize > MAX_MESSAGE_SIZE)
+				{
+					error(String.format("Trying to send information about the max message size. Max size: %d, Actual size: %d", 
+							MAX_MESSAGE_SIZE, contentsSize));
+				}
 				if (commandName.equals("put"))
 				{
 					beginPutFile(targetSender, fileName, contents.toString());
@@ -393,7 +359,7 @@ public class StorageSystemServer extends RPCNode {
 	{
 		if (params.size() == 2 && params.get(0).equals("error"))
 		{
-			error(String.format("NODE %1: %2", addr, params.get(1)));
+			error(String.format("NODE %d: %s", addr, params.get(1)));
 		}		
 		else if (methodName.equals("endGetFile"))
 		{
@@ -404,30 +370,21 @@ public class StorageSystemServer extends RPCNode {
 		endCommand();
 	}
 	
-	/**
-	 * Removes the current command from the queue and executes the next command, if there is one.
-	 */
-	private void endCommand()
-	{
-		// Removes the head
-		_commandQueue.remove();
+	private String readFileContents(String fileName)
+			throws FileNotFoundException, IOException {
+		BufferedReader bufferedReader = this.getReader(fileName);
 		
-		// Gets the next element in the queue (new head) and executes it
-		String command = _commandQueue.peek();		
-		if (command != null)
+		StringBuffer contents = new StringBuffer();
+		
+		String line = bufferedReader.readLine();  
+		while (line != null)
 		{
-			executeClientCommand(command);
+			contents.append(line);
+			
+			line = bufferedReader.readLine();
 		}
-	}
-	
-	/**
-	 * Because the framework doesn't allow us to have two different types running at the same time, we need to implement
-	 * both client and server together.
-	 * 
-	 * To differentiate between one and another, we are assuming that the server has a addr = 0.
-	 */
-	private boolean isServer()
-	{
-		return addr == 0;
+		
+		bufferedReader.close();
+		return contents.toString();
 	}
 }

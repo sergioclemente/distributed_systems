@@ -1,7 +1,8 @@
 package node.rpc;
-import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.LinkedList;
+import java.util.Queue;
 import java.util.Vector;
 import node.reliable.ReliableDeliveryNode;
 import edu.washington.cs.cse490h.lib.PersistentStorageReader;
@@ -9,19 +10,41 @@ import edu.washington.cs.cse490h.lib.PersistentStorageWriter;
 import edu.washington.cs.cse490h.lib.Utility;
 
 
-public class RPCNode extends ReliableDeliveryNode {
+public class RPCNode extends ReliableDeliveryNode {	
 	private static final String TEMP_FILE = ".temp";
-
-
+	
+	private Queue<String> _commandQueue;
+	
+	public RPCNode()
+	{
+		_commandQueue = new LinkedList<String>();
+	}
+	
+	/**
+	 * Parses the commands sent to the client by the simulator or the emulator.
+	 */
+	@Override
+	public void onCommand(String command)
+	{
+		// If this is the server, it doesn't handle onCommand.
+		if (isServer()) return;
+		
+		_commandQueue.add(command);
+		
+		if (_commandQueue.size() == 1)
+		{
+			executeClientCommand(command);
+		}								
+	}
+	
 	@Override
 	public void start() {
 		super.start();
-		info("Start RPC called, address=" + this.addr);
 		recoverFromCrash();
 	}
 
 	/**
-	 * Classes that override this class should use this method to call a method
+	 * Classes that override this class should use this method to send a message
 	 * @param targetSender
 	 * @param methodName
 	 * @param params
@@ -56,13 +79,15 @@ public class RPCNode extends ReliableDeliveryNode {
 		sb.append(" ");
 		sb.append(methodCall.getMethodName());
 		sb.append(" ");
-
-		for	(int i = 0; i < methodCall.getParams().size(); i++) {
-			String paramStr = methodCall.getParams().get(i).toString();
-			sb.append(paramStr.length());
-			sb.append(" ");
-			sb.append(paramStr);
-			sb.append(" ");
+		
+		if (methodCall.getParams() != null) {
+			for	(int i = 0; i < methodCall.getParams().size(); i++) {
+				String paramStr = methodCall.getParams().get(i).toString();
+				sb.append(paramStr.length());
+				sb.append(" ");
+				sb.append(paramStr);
+				sb.append(" ");
+			}	
 		}
 		return sb;
 	}
@@ -96,12 +121,44 @@ public class RPCNode extends ReliableDeliveryNode {
 	}
 
 	/**
+	 * Removes the current command from the queue and executes the next command, if there is one.
+	 */
+	protected void endCommand()
+	{
+		// Removes the head
+		_commandQueue.remove();
+		
+		// Gets the next element in the queue (new head) and executes it
+		String command = _commandQueue.peek();		
+		if (command != null)
+		{
+			executeClientCommand(command);
+		}
+	}
+	
+	protected void executeClientCommand(String command)
+	{
+		
+	}
+	
+	/**
+	 * Because the framework doesn't allow us to have two different types running at the same time, we need to implement
+	 * both client and server together.
+	 * 
+	 * To differentiate between one and another, we are assuming that the server has a addr = 0.
+	 */
+	protected boolean isServer()
+	{
+		return addr == 0;
+	}
+	
+	/**
 	 * Sub classes will call this method in order to store files on disk. it already takes care of crashes
 	 * @param filename
 	 * @param contents
 	 * @throws IOException
 	 */
-	protected void replaceFileContents(String filename, String contents) throws IOException {
+	public void updateFileContents(String filename, String contents, boolean append) throws IOException {
 		try {
 			// read old file
 			String oldFile = readAllLines(filename);
@@ -112,24 +169,35 @@ public class RPCNode extends ReliableDeliveryNode {
 			psw_bck.close();
 
 			// update new
-			PersistentStorageWriter psw = this.getWriter(filename, false);
+			PersistentStorageWriter psw = this.getWriter(filename, append);
 			psw.write(contents);
 			psw.close();
 
 			// delete temporary file
-			File f = new File(TEMP_FILE);
+			PersistentStorageWriter f = this.getWriter(TEMP_FILE, false);
 			f.delete();
 		} catch (IOException e) {
 			throw e;
 		}
 	}
-
+	
+	public void appendFileContents(String filename, String contents) throws IOException {
+		try {
+			// update new
+			PersistentStorageWriter psw = this.getWriter(filename, true);
+			psw.write(contents);
+			psw.close();
+		} catch (IOException e) {
+			throw e;
+		}
+	}
+	
 	private void recoverFromCrash() {
 		try {
-			File f = new File(TEMP_FILE);
-			if (f.exists()) {
+			if (Utility.fileExists(this, TEMP_FILE)) {
 				PersistentStorageReader psw_bck = this.getReader(TEMP_FILE);
 				if (!psw_bck.ready()) {
+					PersistentStorageWriter f = this.getWriter(TEMP_FILE, false);
 					f.delete();
 				} else {
 					String filename = psw_bck.readLine();
@@ -171,5 +239,5 @@ public class RPCNode extends ReliableDeliveryNode {
 		}
 
 		return sb.toString();
-	}
+	}	
 }

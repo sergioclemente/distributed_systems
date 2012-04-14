@@ -8,22 +8,21 @@ import java.util.*;
 
 
 public class ReliableDeliveryNode extends Node {
-	//private SessionManager m_sessionManager = new SessionManager();
 	private Method m_timeoutMethod;
-	
 	private Hashtable<Integer, Session> m_allOutSessions 	= new Hashtable<Integer, Session>();
 	private Hashtable<Integer, Session> m_allInSessions 	= new Hashtable<Integer, Session>();
 	private Hashtable<Integer, Session> m_activeOutSessions = new Hashtable<Integer, Session>();
 	private Hashtable<Integer, Session> m_activeInSessions  = new Hashtable<Integer, Session>();
-	
 
 	private final static int TIMEOUT = 3;
 
+	
 	public class PROTOCOLS {
 		public final static int UNKNOWN = 0;
 		public final static int SCOP 	= 1;		// Simple connection oriented protocol
 	}
 
+	
 	private class MESSAGE_TYPE {
 		public final static int UNKNOWN	= 0;
 		public final static int DATA	= 1;
@@ -32,6 +31,7 @@ public class ReliableDeliveryNode extends Node {
 		public final static int RESET	= 4;
 	}
 
+	
 	public ReliableDeliveryNode() {
 		try {
 			// [B is the same as byte[]
@@ -40,6 +40,7 @@ public class ReliableDeliveryNode extends Node {
 			e.printStackTrace();
 		}
 	}
+	
 
 	/**
 	 * start()
@@ -49,6 +50,7 @@ public class ReliableDeliveryNode extends Node {
 		info("Start called, address=" + this.addr);
 	}
 
+	
 	/**
 	 * onCommand()
 	 * @param command
@@ -67,6 +69,7 @@ public class ReliableDeliveryNode extends Node {
 		info("Command: " + command);
 	}
 
+	
 	/**
 	 * onReceive() is called from the message layer whenever a new message arrives.
 	 */
@@ -222,6 +225,7 @@ public class ReliableDeliveryNode extends Node {
 		this.send(packet.getTo(), PROTOCOLS.SCOP, packet.toByteArray());
 	}
 
+	
 	/**
 	 * Attempts to send an ACK back to the target node 
 	 * @param targetNode
@@ -236,6 +240,7 @@ public class ReliableDeliveryNode extends Node {
 		this.send(ack.getTo(), PROTOCOLS.SCOP, ack.toByteArray());
 	}
 	
+
 	/**
 	 * Attempts to send a RESET back to the target node 
 	 * @param targetNode
@@ -250,6 +255,7 @@ public class ReliableDeliveryNode extends Node {
 		this.send(reset.getTo(), PROTOCOLS.SCOP, reset.toByteArray());
 	}
 
+	
 	/**
 	 * Called by the superclass when this packet's timeout period expires
 	 * @param packet
@@ -312,6 +318,16 @@ public class ReliableDeliveryNode extends Node {
 			}
 		}
 	}
+
+	
+	/**
+	 * This method is called when a packet that was waiting 
+	 * @param identifier
+	 */
+	protected void onReliableMessageSent(int target, int sequence) {
+		info(String.format("Message sent to %d, sequence 0x%08X", target, sequence));
+	}
+	
 	
 	/**
 	 * Method that subclasses will override to handle reliably message received stuff
@@ -430,6 +446,7 @@ public class ReliableDeliveryNode extends Node {
 			{
 				// ACK for a data packet.
 				info("Received ACK for data packet, seq=" + packet.getSequence());
+				onReliableMessageSent(packet.getFrom(), packet.getSequence());
 			}
 			
 			current.removeFromWaitingForAckList(packet.getSequence());
@@ -442,6 +459,7 @@ public class ReliableDeliveryNode extends Node {
 			info("Received stale ACK: " + packet.stringizeHeader());
 		}
 	}
+
 
 	/**
 	 * onReceive_HandleData
