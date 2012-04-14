@@ -6,8 +6,6 @@ import edu.washington.cs.cse490h.lib.Utility;
 import java.lang.reflect.Method;
 import java.util.*;
 
-import util.ByteManipulator;
-
 
 public class ReliableDeliveryNode extends Node {
 	//private SessionManager m_sessionManager = new SessionManager();
