@@ -40,7 +40,7 @@ public class RPCNode extends ReliableDeliveryNode {
 	@Override
 	public void start() {
 		super.start();
-		recoverFromCrash();
+		this.recoverFromCrash();
 	}
 
 	/**

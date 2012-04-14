@@ -6,6 +6,10 @@ import java.util.List;
 import java.util.Random;
 import java.util.Vector;
 
+import edu.washington.cs.cse490h.lib.PersistentStorageReader;
+import edu.washington.cs.cse490h.lib.PersistentStorageWriter;
+import edu.washington.cs.cse490h.lib.Utility;
+
 public class FacebookSystem {
 	private static final String FILE_NAME = "facebookdb.txt";
 	
@@ -15,10 +19,11 @@ public class FacebookSystem {
 	private Hashtable<String, List<Message>> m_messages = new Hashtable<String, List<Message>>();
 	private Hashtable<String, String> m_activeSessions = new Hashtable<String, String>();
 	private Random m_random = new Random();
+	private boolean m_inRecovery = false;
 	
-	private INode m_node;
+	private FacebookRPCNode m_node;
 	
-	public FacebookSystem(INode node) {
+	public FacebookSystem(FacebookRPCNode node) {
 		this.m_node = node;
 	}
 	
@@ -26,7 +31,7 @@ public class FacebookSystem {
 		if (this.m_users.containsKey(username)) {
 			throw new FacebookException(FacebookException.USER_ALREADY_EXISTS);
 		} else {
-			this.appendToLog("create_user " + username + password);
+			this.appendToLog("create_user " + username + " " + password);
 			this.m_users.put(username, new User(username, password));
 		}
 	}
@@ -37,7 +42,7 @@ public class FacebookSystem {
 			// todo: just to make testing easier
 			String token = username;
 			this.m_activeSessions.put(token, username);
-			this.m_node.info("User: " + username + " logged in, token: " + token);
+			this.info("User: " + username + " logged in, token: " + token);
 			return token;
 		} else {
 			throw new FacebookException(FacebookException.USER_DONT_EXIST);
@@ -47,7 +52,7 @@ public class FacebookSystem {
 	public void logout(String token) throws FacebookException {
 		if (this.m_activeSessions.containsKey(token)) {
 			this.m_activeSessions.remove(token);
-			this.m_node.info("Token: " + token + " logged out");
+			this.info("Token: " + token + " logged out");
 		} else {
 			throw new FacebookException(FacebookException.SESSION_DONT_EXIST);
 		}
@@ -75,7 +80,7 @@ public class FacebookSystem {
 		}
 		User friendUser = this.m_users.get(friendLogin);
 		listFriends.add(friendUser);
-		this.m_node.info("User: " + login + " requested to be friends of user " + friendLogin);
+		this.info("User: " + login + " requested to be friends of user " + friendLogin);
 	}
 	
 	public void acceptFriend(String token, String friendLogin) throws FacebookException {
@@ -90,7 +95,7 @@ public class FacebookSystem {
 	private void internalAcceptFriend(String login, String friendLogin) throws FacebookException {
 		addFriendToList(login, friendLogin);
 		addFriendToList(friendLogin, login);
-		this.m_node.info("User: " + login + " accepted to be friends of user " + friendLogin);
+		this.info("User: " + login + " accepted to be friends of user " + friendLogin);
 	}
 	
 	private void addFriendToList(String login, String friendLogin) throws FacebookException {
@@ -109,6 +114,11 @@ public class FacebookSystem {
 	}
 
 	private User getUserFromToken(String token) throws FacebookException {
+		// If in recovery mode, the token will be the login
+		if (m_inRecovery) {
+			return this.m_users.get(token);
+		}
+		
 		if (this.m_activeSessions.containsKey(token)) {
 			String login = this.m_activeSessions.get(token);
 			return this.m_users.get(login);
@@ -123,7 +133,7 @@ public class FacebookSystem {
 		String login = user.getLogin();
 		internalPostMessageToAllFriends(login, message);
 		
-		this.m_node.info("User: " + login + " posted the following message to all users " + message);
+		this.info("User: " + login + " posted the following message to all users " + message);
 	}
 	
 	public void internalPostMessageToAllFriends(String login, String message) {
@@ -159,11 +169,14 @@ public class FacebookSystem {
 	}
 	
 	private void appendToLog(String content) {
-		try {
-			this.m_node.appendFileContents(FILE_NAME, content + "\n");
-		} catch (IOException e) {
-			// TODO: return the proper error
-			e.printStackTrace();
+		// Don't append to the log if in recovery mode
+		if (!m_inRecovery) {
+			try {
+				this.m_node.appendFileContents(FILE_NAME, content + "\n");
+			} catch (IOException e) {
+				// TODO: return the proper error
+				e.printStackTrace();
+			}
 		}
 	}
 
@@ -174,5 +187,46 @@ public class FacebookSystem {
 			sb.append(Character.toChars('0' + m_random.nextInt(10)));
 		}
 		return sb.toString();
+	}
+	
+	private void info(String s) {
+		// Use a different prefix to be easy to distinguish
+		System.out.println(">>>> " + s);
+	}
+
+	public void recoverFromCrash() {
+		try {
+			m_inRecovery = true;
+			if (Utility.fileExists(this.m_node, FILE_NAME)) {
+				PersistentStorageReader psr = this.m_node.getReader(FILE_NAME);
+				String line;
+				while ((line = psr.readLine()) != null) {
+					executeCommand(line);
+				}
+				psr.close();				
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		} finally {
+			m_inRecovery = false;
+		}
+	}
+
+	private void executeCommand(String command) throws FacebookException {
+		String[] parts = command.split("\\s+");
+		String methodName = parts[0];
+		
+		if (methodName.startsWith("create_user")) {
+			this.createUser(parts[1], parts[2]);
+		} else if (methodName.startsWith("add_friend")) {
+			this.addFriend(parts[1], parts[2]);
+		} else if (methodName.startsWith("accept_friend")) {
+			this.acceptFriend(parts[1], parts[2]);
+		} else if (methodName.startsWith("write_message_all")) {
+			this.writeMessagesAll(parts[1], parts[2]);
+		} else {
+			throw new FacebookException(FacebookException.INVALID_FACEBOOK_METHOD);
+		}
+		
 	}
 }

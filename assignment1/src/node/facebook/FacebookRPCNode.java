@@ -4,14 +4,21 @@ import java.util.Vector;
 
 import node.rpc.RPCNode;
 
-public class FacebookRPCNode extends RPCNode implements INode {
+public class FacebookRPCNode extends RPCNode {
 	private FacebookSystem m_system;
 	private static final String ERROR_MESSAGE_FORMAT = 
 			"Error: %s on facebook server %d. Returned error code was %s";
 	
 	public FacebookRPCNode() {
+	}
+	
+	@Override
+	public void start() {
+		super.start();
 		if (this.isServer()) {
 			this.m_system = new FacebookSystem(this);
+			// Replay the file in memory
+			this.m_system.recoverFromCrash();
 		}
 	}
 	 
@@ -83,13 +90,18 @@ public class FacebookRPCNode extends RPCNode implements INode {
 		this.callMethod(0, verb, params);
 	}
 	
+	private void user_info(String s) {
+		// Use a different prefix to be easy to distinguish
+		System.out.println(">>>> " + s);
+	}
+	
 	private void endClientCommand(int from, String methodName, Vector<String> params)
 	{
 		if (params.size() == 2 && params.get(0).equals("error"))
 		{
-			error(String.format("NODE %d: %s", this.addr, params.get(1)));
+			user_info(String.format("NODE %d: %s", this.addr, params.get(1)));
 		} else if (params.size() == 2 && params.get(0).equals("ok")) {
-			info("Server returned: " + params.get(1));
+			user_info("Server returned: " + params.get(1));
 		}
 		
 		// Will remove this command from the queue and executes the next one, if any
