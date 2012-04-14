@@ -115,13 +115,13 @@ public class ReliableDeliveryNode extends Node {
 	}
 
 	
-	protected void warn(String msg) {
+	public void warn(String msg) {
 		// Put some markers in the beginning so we can easily distinguish between system messages
 		System.out.println(String.format("*** %d: WRN: %s", this.addr, msg));
 	}
 
 	
-	protected void info(String msg) {
+	public void info(String msg) {
 		// Put some markers in the beginning so we can easily distinguish between system messages
 		System.out.println(String.format("*** %d: INF: %s", this.addr, msg));
 	}
