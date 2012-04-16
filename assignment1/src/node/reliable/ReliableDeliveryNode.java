@@ -34,7 +34,6 @@ public class ReliableDeliveryNode extends Node {
 	
 	public ReliableDeliveryNode() {
 		try {
-			// [B is the same as byte[]
 			this.m_timeoutMethod = Callback.getMethod("onTimeout", this, new String[] { "node.reliable.Packet" });
 		} catch (Exception e) {
 			e.printStackTrace();
