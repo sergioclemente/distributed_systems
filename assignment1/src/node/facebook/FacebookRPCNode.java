@@ -1,11 +1,13 @@
 package node.facebook;
 
 import java.util.Vector;
-
 import node.rpc.RPCNode;
+
 
 public class FacebookRPCNode extends RPCNode {
 	private FacebookSystem m_system;
+	private String m_pendingCommand = null;
+	
 	private static final String ERROR_MESSAGE_FORMAT = 
 			"Error: %s on facebook server %d. Returned error code was %s";
 	
@@ -23,7 +25,7 @@ public class FacebookRPCNode extends RPCNode {
 	}
 	 
 	@Override
-	protected void onMethodCalled (int from, String methodName, Vector<String> params) {
+	protected void onMethodCalled(int from, String methodName, Vector<String> params) {
 		if (isServer())
 		{
 			executeServerCommand(from, methodName, params);
@@ -55,7 +57,7 @@ public class FacebookRPCNode extends RPCNode {
 				this.m_system.acceptFriend(params.get(0), params.get(1));
 			} else if (methodName.startsWith("write_message_all")) {
 				this.m_system.writeMessagesAll(params.get(0), params.get(1));
-			} else if (methodName.startsWith("read_message_all")){
+			} else if (methodName.startsWith("read_message_all")) {
 				returnValue = this.m_system.readMessagesAll(params.get(0));
 			} else {
 				throw new FacebookException(FacebookException.INVALID_FACEBOOK_METHOD);
@@ -70,6 +72,7 @@ public class FacebookRPCNode extends RPCNode {
 			returnParams.add(String.format(ERROR_MESSAGE_FORMAT, methodName, this.addr, e.getExceptionCode()));
 		}
 		
+		m_pendingCommand = returnMethodName;
 		this.callMethod(from, returnMethodName, returnParams);		
 	}
 
@@ -86,7 +89,8 @@ public class FacebookRPCNode extends RPCNode {
 		for (int i = 1; i < parts.length; i++) {
 			params.add(parts[i]);
 		}
-		
+	
+		m_pendingCommand = verb;
 		this.callMethod(0, verb, params);
 	}
 	
@@ -106,5 +110,19 @@ public class FacebookRPCNode extends RPCNode {
 		
 		// Will remove this command from the queue and executes the next one, if any
 		endCommand();
+	}
+	
+	@Override
+	protected void onConnectionAborted(int endpoint) {
+		if (isServer()) {
+			// Nothing to do here
+		} else {
+			if (m_pendingCommand != null) {
+				Vector<String> args = new Vector<String>();
+				args.add("error");
+				args.add(String.format(ERROR_MESSAGE_FORMAT, m_pendingCommand, 0, FacebookException.CONNECTION_ABORTED));
+				endClientCommand(0, m_pendingCommand, args);
+			}
+		}
 	}
 }

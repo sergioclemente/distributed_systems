@@ -27,10 +27,13 @@ public class RPCNode extends ReliableDeliveryNode {
 	public void onCommand(String command)
 	{
 		// If this is the server, it doesn't handle onCommand.
-		if (isServer()) return;
+		if (isServer()) 
+			return;
 		
 		_commandQueue.add(command);
 		
+		// If the _commandQueue was empty, execute the command now.
+		// Otherwise it'll be executed when the current command finishes.
 		if (_commandQueue.size() == 1)
 		{
 			executeClientCommand(command);
@@ -69,7 +72,7 @@ public class RPCNode extends ReliableDeliveryNode {
 	 * @param methodName
 	 * @param params
 	 */
-	protected void onMethodCalled (int from, String methodName, Vector<String> params) {
+	protected void onMethodCalled(int from, String methodName, Vector<String> params) {
 
 	}
 
@@ -138,8 +141,8 @@ public class RPCNode extends ReliableDeliveryNode {
 	
 	protected void executeClientCommand(String command)
 	{
-		
 	}
+	
 	
 	/**
 	 * Because the framework doesn't allow us to have two different types running at the same time, we need to implement

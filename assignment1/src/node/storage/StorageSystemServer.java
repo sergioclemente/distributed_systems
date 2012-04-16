@@ -1,7 +1,5 @@
 package node.storage;
 
-
-
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -11,6 +9,7 @@ import java.util.Vector;
 import node.rpc.RPCNode;
 import edu.washington.cs.cse490h.lib.PersistentStorageWriter;
 import edu.washington.cs.cse490h.lib.Utility;
+
 
 public class StorageSystemServer extends RPCNode {
 	
@@ -41,7 +40,7 @@ public class StorageSystemServer extends RPCNode {
 		}
 	}	
 	
-	public void createFile (int from, String fileName)
+	public void createFile(int from, String fileName)
 	{		
 		Vector<String> params = new Vector<String>();
 		
@@ -54,7 +53,7 @@ public class StorageSystemServer extends RPCNode {
 		{
 			try 
 			{			
-					this.getWriter(fileName, false);
+				this.getWriter(fileName, false);
 			} 
 			catch (IOException e) 
 			{
@@ -256,14 +255,15 @@ public class StorageSystemServer extends RPCNode {
 			{							
 				if (parts.length < 4)
 				{
-					warn(String.format("Invalid number of argumetns for 'put' or 'append'. Expected at least 4. Found: %1", parts.length));
+					warn(String.format("Invalid number of arguments for 'put' or 'append'. Expected at least 4. Found: %1", parts.length));
 					endCommand();
 				}
 				
-				StringBuilder contents = new StringBuilder(parts.length - 3);
+				StringBuilder contents = new StringBuilder();
 				
 				for (int i = 3; i < parts.length; i++) {
 					contents.append(parts[i]);
+					// BUG: append " "?
 				}
 				
 				int contentsSize = contents.toString().getBytes().length;
@@ -273,6 +273,7 @@ public class StorageSystemServer extends RPCNode {
 					error(String.format("Trying to send information about the max message size. Max size: %d, Actual size: %d", 
 							MAX_MESSAGE_SIZE, contentsSize));
 				}
+				
 				if (commandName.equals("put"))
 				{
 					beginPutFile(targetSender, fileName, contents.toString());
@@ -309,7 +310,7 @@ public class StorageSystemServer extends RPCNode {
 			Vector<String> params) {
 		if (params.size() < 1)
 		{
-			error(String.format("Invalid number of arguments passed. Expected 1, found %1", params.size()));
+			error(String.format("Invalid number of arguments passed. Expected 1, found %d", params.size()));
 		}
 		
 		String fileName = params.get(0);
@@ -326,7 +327,7 @@ public class StorageSystemServer extends RPCNode {
 		{
 			if (params.size() < 2)
 			{
-				error(String.format("Invalid number of arguments passed. Expected 1, found %1", params.size()));
+				error(String.format("Invalid number of arguments passed. Expected 2, found %d", params.size()));
 			}
 			
 			StringBuilder contents = new StringBuilder();
@@ -351,7 +352,7 @@ public class StorageSystemServer extends RPCNode {
 		}
 		else
 		{
-			error(String.format("Unknown command: %1", methodName));
+			error(String.format("Unknown command: %d", methodName));
 		}
 	}
 	

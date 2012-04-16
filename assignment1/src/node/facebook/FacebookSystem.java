@@ -10,36 +10,57 @@ import edu.washington.cs.cse490h.lib.PersistentStorageReader;
 import edu.washington.cs.cse490h.lib.PersistentStorageWriter;
 import edu.washington.cs.cse490h.lib.Utility;
 
+
 public class FacebookSystem {
 	private static final String FILE_NAME = "facebookdb.txt";
 	
 	private Hashtable<String, User> m_users = new Hashtable<String, User>();
 	private Hashtable<String, List<User>> m_friends = new Hashtable<String, List<User>>();
-	private Hashtable<String, List<User>> m_friendRequestss = new Hashtable<String, List<User>>();
+	private Hashtable<String, List<User>> m_friendRequests = new Hashtable<String, List<User>>();
 	private Hashtable<String, List<Message>> m_messages = new Hashtable<String, List<Message>>();
 	private Hashtable<String, String> m_activeSessions = new Hashtable<String, String>();
-	private Random m_random = new Random();
+	private Random m_random = Utility.getRNG();
 	private boolean m_inRecovery = false;
-	
 	private FacebookRPCNode m_node;
 	
 	public FacebookSystem(FacebookRPCNode node) {
 		this.m_node = node;
 	}
 	
+	/**
+	 * API: createUser()
+	 * 
+	 * @param username
+	 * @param password
+	 * @throws FacebookException
+	 */
 	public void createUser(String username, String password) throws FacebookException {
-		if (this.m_users.containsKey(username)) {
+		if (this.isValidUser(username)) {
 			throw new FacebookException(FacebookException.USER_ALREADY_EXISTS);
 		} else {
 			this.appendToLog("create_user " + username + " " + password);
 			this.m_users.put(username, new User(username, password));
+			
+			// Create ancillary data structures now.
+			// Makes the code cleaner than lazy creation.
+			this.m_friends.put(username, new Vector<User>());
+			this.m_friendRequests.put(username, new Vector<User>());
+			this.m_messages.put(username,  new Vector<Message>());
 		}
 	}
 	
+	/**
+	 * API: login()
+	 * 
+	 * @param username
+	 * @param password
+	 * @return
+	 * @throws FacebookException
+	 */
 	public String login(String username, String password) throws FacebookException {
-		if (this.m_users.containsKey(username)) {
+		if (this.isValidUser(username)) {
 			//String token = nextSessionId();
-			// todo: just to make testing easier
+			// TODO: just to make testing easier
 			String token = username;
 			this.m_activeSessions.put(token, username);
 			this.info("User: " + username + " logged in, token: " + token);
@@ -49,6 +70,12 @@ public class FacebookSystem {
 		}
 	}
 	
+	/**
+	 * API: logout()
+	 * 
+	 * @param token
+	 * @throws FacebookException
+	 */
 	public void logout(String token) throws FacebookException {
 		if (this.m_activeSessions.containsKey(token)) {
 			this.m_activeSessions.remove(token);
@@ -58,41 +85,72 @@ public class FacebookSystem {
 		}
 	}
 	
-	public void addFriend(String token, String friendLogin) throws FacebookException {
-		User user = getUserFromToken(token);
-		this.appendToLog("add_friend " + user.getLogin() + " " + friendLogin);
-		
-		String login = user.getLogin();
-		
-		internalAddFriend(login, friendLogin);
+	public boolean isLoggedIn(String token)
+	{
+		return this.m_activeSessions.containsKey(token);
+	}
+
+	public boolean isValidUser(String username)
+	{
+		return this.m_users.containsKey(username);
 	}
 	
-	private void internalAddFriend(String login, String friendLogin) throws FacebookException {
-		List<User> listFriends;
-		if (this.m_friendRequestss.containsKey(login)) {
-			listFriends = this.m_friends.get(login);
-		} else {
-			listFriends = new Vector<User>();
-			this.m_friendRequestss.put(login, listFriends);
-		}
-		if (!this.m_users.containsKey(friendLogin)) {
+	/**
+	 * API: addFriend()
+	 * 
+	 * @param token
+	 * @param friendLogin
+	 * @throws FacebookException
+	 */
+	public void addFriend(String token, String friendLogin) throws FacebookException {
+		User user = getUserFromToken(token);
+		String login = user.getLogin();
+
+		if (!this.isValidUser(friendLogin)) {
 			throw new FacebookException(FacebookException.USER_DONT_EXIST);
 		}
-		User friendUser = this.m_users.get(friendLogin);
-		listFriends.add(friendUser);
+
+		// Only add to log valid friend requests 
+		this.appendToLog("add_friend " + login + " " + friendLogin);
+
+		// Get the *friend's* request list
+		List<User> listFriends;
+		listFriends = this.m_friendRequests.get(friendLogin);
+		
+		// Add the user to the friend's request list
+		listFriends.add(user);
 		this.info("User: " + login + " requested to be friends of user " + friendLogin);
 	}
 	
+	/**
+	 * API: acceptFriend()
+	 * 
+	 * @param token
+	 * @param friendLogin
+	 * @throws FacebookException
+	 */
 	public void acceptFriend(String token, String friendLogin) throws FacebookException {
 		User user = getUserFromToken(token);
-		this.appendToLog("accept_friend " + user.getLogin() + " " + friendLogin);
-		
 		String login = user.getLogin();
 		
-		internalAcceptFriend(login, friendLogin);
-	}
-	
-	private void internalAcceptFriend(String login, String friendLogin) throws FacebookException {
+		if (!this.isValidUser(friendLogin)) {
+			throw new FacebookException(FacebookException.USER_DONT_EXIST);
+		}
+
+		List<User> requestList;
+		requestList = this.m_friendRequests.get(login);
+		
+		User friendUser;
+		friendUser = this.m_users.get(friendLogin);
+		
+		if (!requestList.contains(friendUser)) {
+			// Can't accept friendship of somebody who hasn't requested it
+			throw new FacebookException(FacebookException.INVALID_REQUEST);
+		}
+		
+		this.appendToLog("accept_friend " + login + " " + friendLogin);
+		
+		requestList.remove(friendUser);
 		addFriendToList(login, friendLogin);
 		addFriendToList(friendLogin, login);
 		this.info("User: " + login + " accepted to be friends of user " + friendLogin);
@@ -100,17 +158,14 @@ public class FacebookSystem {
 	
 	private void addFriendToList(String login, String friendLogin) throws FacebookException {
 		List<User> listFriends;
-		if (this.m_friends.containsKey(login)) {
-			listFriends = this.m_friends.get(login);
-		} else {
-			listFriends = new Vector<User>();
-			this.m_friends.put(login, listFriends);
-		}
-		if (!this.m_users.containsKey(friendLogin)) {
-			throw new FacebookException(FacebookException.USER_DONT_EXIST);
-		}
+		listFriends = this.m_friends.get(login);
+		
 		User friendUser = this.m_users.get(friendLogin);
-		listFriends.add(friendUser);
+		if (!listFriends.contains(friendUser)) {
+			listFriends.add(friendUser);
+		} else {
+			this.info("Friend " + friendLogin + " already in " + login + "'s friend list");
+		}
 	}
 
 	private User getUserFromToken(String token) throws FacebookException {
@@ -127,44 +182,52 @@ public class FacebookSystem {
 		}
 	}
 
+	/**
+	 * API: writeMessagesAll()
+	 * 
+	 * @param token
+	 * @param message
+	 * @throws FacebookException
+	 */
 	public void writeMessagesAll(String token, String message) throws FacebookException {
 		User user = getUserFromToken(token);
-		this.appendToLog("write_message_all " + user.getLogin() + " " + message);
 		String login = user.getLogin();
-		internalPostMessageToAllFriends(login, message);
-		
+
+		assert this.m_friends.containsKey(login);
+		List<User> friends = this.m_friends.get(login);
+		Message m = new Message(login, message);
+		for (User friend : friends) {
+			List<Message> msglist;
+			msglist = this.m_messages.get(friend.getLogin());
+			msglist.add(m);
+			this.info("Added to user " + friend.getLogin() + " message: [" + m.getMessage() + "]");
+		}
+
+		this.appendToLog("write_message_all " + user.getLogin() + " " + message);
+	
 		this.info("User: " + login + " posted the following message to all users " + message);
 	}
 	
-	public void internalPostMessageToAllFriends(String login, String message) {
-		if (this.m_friends.containsKey(login)) {
-			List<User> friends = this.m_friends.get(login);
-			Message m = new Message(login, message);
-			for (User friend : friends) {
-				List<Message> messages;
-				if (this.m_messages.containsKey(friend.getLogin())) {
-					messages = this.m_messages.get(friend.getLogin());
-				} else {
-					messages = new Vector<Message>();
-					this.m_messages.put(friend.getLogin(), messages);
-				}
-				messages.add(m);
-			}
-		}
-	}
-
+	/**
+	 * API: readMessagesAll()
+	 * 
+	 * @param token
+	 * @return
+	 * @throws FacebookException
+	 */
 	public String readMessagesAll(String token) throws FacebookException {
 		User user = getUserFromToken(token);
 		String login = user.getLogin();
 		
 		StringBuffer sb = new StringBuffer();
-		if (this.m_messages.containsKey(login)) {
-			List<Message> listOfMessages = this.m_messages.get(login);
-			for (Message message : listOfMessages) {
-				sb.append(message.getMessage());
-				sb.append('\n');
-			}
+		assert this.m_messages.containsKey(login);
+		
+		List<Message> listOfMessages = this.m_messages.get(login);
+		for (Message message : listOfMessages) {
+			sb.append(message.getMessage());
+			sb.append('\n');
 		}
+
 		return sb.toString();
 	}
 	
@@ -201,6 +264,7 @@ public class FacebookSystem {
 				PersistentStorageReader psr = this.m_node.getReader(FILE_NAME);
 				String line;
 				while ((line = psr.readLine()) != null) {
+					info("Recovery: replaying command from log: " + line);
 					executeCommand(line);
 				}
 				psr.close();				
