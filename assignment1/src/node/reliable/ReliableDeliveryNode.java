@@ -425,6 +425,9 @@ public class ReliableDeliveryNode extends Node {
 					current.addToWaitingForAckList(dataPacket.getSequence());
 					this.internalSendPacket(dataPacket, TIMEOUT);
 				}
+			} else {
+				 // ACK for a data packet.
+				info("Received ACK for data packet, seq=" + packet.getSequence());
 			}
 			
 			current.removeFromWaitingForAckList(packet.getSequence());
