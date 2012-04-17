@@ -13,7 +13,7 @@ import edu.washington.cs.cse490h.lib.Utility;
 public class RPCNode extends ReliableDeliveryNode {	
 	private static final String TEMP_FILE = ".temp";
 	
-	private Queue<String> _commandQueue;
+	protected Queue<String> _commandQueue;
 	
 	public RPCNode()
 	{

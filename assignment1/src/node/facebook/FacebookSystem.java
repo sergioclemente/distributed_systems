@@ -59,9 +59,7 @@ public class FacebookSystem {
 	 */
 	public String login(String username, String password) throws FacebookException {
 		if (this.isValidUser(username)) {
-			//String token = nextSessionId();
-			// TODO: just to make testing easier
-			String token = username;
+			String token = nextSessionId();
 			this.m_activeSessions.put(token, username);
 			this.info("User: " + username + " logged in, token: " + token);
 			return token;
@@ -224,6 +222,10 @@ public class FacebookSystem {
 		
 		List<Message> listOfMessages = this.m_messages.get(login);
 		for (Message message : listOfMessages) {
+			sb.append("From:");
+			sb.append(message.getFromLogin());
+			sb.append('\n');
+			sb.append("Content:");
 			sb.append(message.getMessage());
 			sb.append('\n');
 		}

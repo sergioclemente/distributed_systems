@@ -6,7 +6,6 @@ import node.rpc.RPCNode;
 
 public class FacebookRPCNode extends RPCNode {
 	private FacebookSystem m_system;
-	private String m_pendingCommand = null;
 	
 	private static final String ERROR_MESSAGE_FORMAT = 
 			"Error: %s on facebook server %d. Returned error code was %s";
@@ -32,7 +31,8 @@ public class FacebookRPCNode extends RPCNode {
 		}
 		else
 		{
-			endClientCommand(from, methodName, params);
+			// Make to lower
+			endClientCommand(from, methodName.toLowerCase().trim(), params);
 		}
 	}
 	
@@ -55,7 +55,7 @@ public class FacebookRPCNode extends RPCNode {
 				this.m_system.addFriend(params.get(0), params.get(1));
 			} else if (methodName.startsWith("accept_friend")) {
 				this.m_system.acceptFriend(params.get(0), params.get(1));
-			} else if (methodName.startsWith("write_message_all")) {
+			} else if (methodName.startsWith("write_message_all")) { 
 				this.m_system.writeMessagesAll(params.get(0), params.get(1));
 			} else if (methodName.startsWith("read_message_all")) {
 				returnValue = this.m_system.readMessagesAll(params.get(0));
@@ -72,7 +72,6 @@ public class FacebookRPCNode extends RPCNode {
 			returnParams.add(String.format(ERROR_MESSAGE_FORMAT, methodName, this.addr, e.getExceptionCode()));
 		}
 		
-		m_pendingCommand = returnMethodName;
 		this.callMethod(from, returnMethodName, returnParams);		
 	}
 
@@ -83,15 +82,27 @@ public class FacebookRPCNode extends RPCNode {
 	{
 		String[] parts = command.split("\\s+");
 		
-		String verb = parts[0];
+		String methodName = parts[0];
 		
 		Vector<String> params = new Vector<String>();
-		for (int i = 1; i < parts.length; i++) {
-			params.add(parts[i]);
+		
+		if (methodName.startsWith("write_message_all")) {
+			int idx = command.indexOf(' ');
+			int nextIdx = command.indexOf(' ', idx+1);
+			
+			if (idx != -1 && nextIdx != -1) {
+				String token = command.substring(idx, nextIdx).trim();
+				String msg = command.substring(nextIdx, command.length()).trim();
+				params.add(token);
+				params.add(msg);
+			}
+		} else {
+			for (int i = 1; i < parts.length; i++) {
+				params.add(parts[i]);
+			}
 		}
-	
-		m_pendingCommand = verb;
-		this.callMethod(0, verb, params);
+
+		this.callMethod(0, methodName, params);
 	}
 	
 	private void user_info(String s) {
@@ -104,8 +115,10 @@ public class FacebookRPCNode extends RPCNode {
 		if (params.size() == 2 && params.get(0).equals("error"))
 		{
 			user_info(String.format("NODE %d: %s", this.addr, params.get(1)));
-		} else if (params.size() == 2 && params.get(0).equals("ok")) {
-			user_info("Server returned: " + params.get(1));
+		} else if (params.size() >= 1 && params.get(0).equals("ok")) {
+			String returnValue = params.size() == 2 ? params.get(1) : null;
+			
+			user_info("Server returned ok. returnValue=" + returnValue);
 		}
 		
 		// Will remove this command from the queue and executes the next one, if any
@@ -117,11 +130,12 @@ public class FacebookRPCNode extends RPCNode {
 		if (isServer()) {
 			// Nothing to do here
 		} else {
-			if (m_pendingCommand != null) {
+			String pendingCommand;
+			if ((pendingCommand = this._commandQueue.peek()) != null) {
 				Vector<String> args = new Vector<String>();
 				args.add("error");
-				args.add(String.format(ERROR_MESSAGE_FORMAT, m_pendingCommand, 0, FacebookException.CONNECTION_ABORTED));
-				endClientCommand(0, m_pendingCommand, args);
+				args.add(String.format(ERROR_MESSAGE_FORMAT, pendingCommand, 0, FacebookException.CONNECTION_ABORTED));
+				endClientCommand(0, pendingCommand, args);
 			}
 		}
 	}
