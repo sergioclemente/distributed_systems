@@ -1,0 +1,75 @@
+// Create file happy path
+start 0
+start 1
+start 2
+1 create 0 test1.txt
+time
+time
+// Create already existing file path
+2 create 0 test1.txt
+time
+time
+// Put contents in a file happy path
+1 put 0 test1.txt Testing123
+time
+time
+// Put contents in a non-existing file
+1 put 0 nonexisting.txt Testing123
+time
+time
+// Get contents happy path
+2 get 0 test1.txt
+time
+time
+// Get contents from a non-existing file
+2 get 0 nonexisting.txt
+time
+time
+// Append happy path
+1 append 0 test1.txt 456789
+time
+time
+2 get 0 test1.txt
+time
+time
+// Append to non-existing file
+1 append 0 nonexisting.txt 456789
+time
+time
+// Timeout on get file
+crash 0
+2 get 0 test1.txt
+time
+time
+time
+time
+time
+time
+time
+// Create file - issuing client dies
+1 create 0 test2.txt
+time
+fail 1
+time
+2 put 0 test2.txt testing2
+time
+time
+start 1
+1 get 0 test2.txt
+time
+time
+1 delete 0 test2.txt
+time
+time
+// Append file - server crashes before sending endCommand and restarts right afterwards
+1 create 0 test3.txt
+time
+time
+1 append 0 test3.txt Testing3
+time
+fail 0
+time
+start 0
+time
+time
+exit
