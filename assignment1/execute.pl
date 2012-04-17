@@ -6,7 +6,7 @@ main();
 
 sub main {
     
-    $classpath = "src/:jars/plume.jar:jars/lib.jar:bin/";
+    $classpath = "src/:jars/plume.jar:jars/lib.jar:classes/";
     
     $args = join " ", @ARGV;
 
