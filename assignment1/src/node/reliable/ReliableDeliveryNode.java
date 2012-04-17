@@ -15,6 +15,7 @@ public class ReliableDeliveryNode extends Node {
 	private Hashtable<Integer, Session> m_activeInSessions  = new Hashtable<Integer, Session>();
 
 	private final static int TIMEOUT = 3;
+	private final static int MAX_TIMEOUT = 9;
 
 	
 	public class PROTOCOLS {
@@ -34,7 +35,7 @@ public class ReliableDeliveryNode extends Node {
 	
 	public ReliableDeliveryNode() {
 		try {
-			this.m_timeoutMethod = Callback.getMethod("onTimeout", this, new String[] { "node.reliable.Packet" });
+			this.m_timeoutMethod = Callback.getMethod("onTimeout", this, new String[] { "node.reliable.Packet", "java.lang.Integer" });
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -161,7 +162,7 @@ public class ReliableDeliveryNode extends Node {
 			assert session.getSequence() == 0;
 			packet = Packet.Create(this.addr, targetNode, MESSAGE_TYPE.CONNECT, session.getConnectionId(), session.getSequence(), null);
 			session.addToWaitingForAckList(session.getSequence());
-			internalSendPacket(packet);
+			internalSendPacket(packet, TIMEOUT);
 			session.setConnecting();
 		}
 		
@@ -185,7 +186,7 @@ public class ReliableDeliveryNode extends Node {
 		{
 			// Connection already established, just send the packet
 			session.addToWaitingForAckList(session.getSequence());
-			internalSendPacket(packet);
+			internalSendPacket(packet, TIMEOUT);
 		}
 	}
 
@@ -199,26 +200,15 @@ public class ReliableDeliveryNode extends Node {
 	protected void onConnectionAborted(int endpoint) {
 		info("Connection closed for endpoint " + endpoint);
 	}
-
-	
-	/**
-	 * This method is called when the transport layer gives up sending the packet.
-	 * TODO: should provide more info to the upper layer. 
-	 * @param endpoint the remote endpoint that the connection is being affected
-	 */
-	protected void onMessageTimeout(int endpoint) {
-		info("Unable to send message to endpoint " + endpoint);
-	}
-	
 	
 	/**
 	 * Attempts to send the given packet to the target node
 	 * @param packet
 	 */
-	private void internalSendPacket(Packet packet) 
+	private void internalSendPacket(Packet packet, int timeout) 
 	{
-		Callback cb = new Callback(this.m_timeoutMethod, this, new Object[] { packet });
-		this.addTimeout(cb, TIMEOUT);
+		Callback cb = new Callback(this.m_timeoutMethod, this, new Object[] { packet, timeout });
+		this.addTimeout(cb, timeout);
 
 		info("Sending packet: " + packet.stringize());
 		this.send(packet.getTo(), PROTOCOLS.SCOP, packet.toByteArray());
@@ -259,7 +249,7 @@ public class ReliableDeliveryNode extends Node {
 	 * Called by the superclass when this packet's timeout period expires
 	 * @param packet
 	 */
-	public void onTimeout(Packet packet)
+	public void onTimeout(Packet packet, Integer currentTimeout)
 	{
 		Session session = getOutboundByNode(packet.getTo());
 		
@@ -268,8 +258,13 @@ public class ReliableDeliveryNode extends Node {
 			// Resend the packet if we didn't receive the ack yet
 			if (session.containsInWaitingForAckList(packet.getSequence())) 
 			{
-				info("Timeout: Resending undelivered packet: " + packet.stringizeHeader());
-				this.internalSendPacket(packet);
+				if (currentTimeout.intValue() == MAX_TIMEOUT) {
+					this.internalSendReset(packet.getTo(), packet.getConnectionId(), packet.getSequence());
+					this.onConnectionAborted(packet.getTo());
+				} else {
+					info("Timeout: Resending undelivered packet: " + packet.stringizeHeader());
+					this.internalSendPacket(packet, currentTimeout + TIMEOUT);
+				}
 			}
 			else
 			{
@@ -306,27 +301,17 @@ public class ReliableDeliveryNode extends Node {
 				info("Dropping stale queued packet: " + queuedPacket.stringizeHeader());
 				
 				assert packet.getType() == MESSAGE_TYPE.DATA;
-				onMessageTimeout(packet.getTo());
+				onConnectionAborted(packet.getTo());
 			}
 
 			info("Dropping stale outbound packet: " + packet.stringizeHeader());
 			if (packet.getType() == MESSAGE_TYPE.DATA)
 			{
 				// Only notify upper layer of cancelled DATA packets
-				onMessageTimeout(packet.getTo());
+				onConnectionAborted(packet.getTo());
 			}
 		}
 	}
-
-	
-	/**
-	 * This method is called when a packet that was waiting 
-	 * @param identifier
-	 */
-	protected void onReliableMessageSent(int target, int sequence) {
-		info(String.format("Message sent to %d, sequence 0x%08X", target, sequence));
-	}
-	
 	
 	/**
 	 * Method that subclasses will override to handle reliably message received stuff
@@ -438,14 +423,8 @@ public class ReliableDeliveryNode extends Node {
 					dataPacket = current.getSendQueue().remove();
 					info("Sending queued packet: " + dataPacket.stringize());
 					current.addToWaitingForAckList(dataPacket.getSequence());
-					this.internalSendPacket(dataPacket);
+					this.internalSendPacket(dataPacket, TIMEOUT);
 				}
-			}
-			else
-			{
-				// ACK for a data packet.
-				info("Received ACK for data packet, seq=" + packet.getSequence());
-				onReliableMessageSent(packet.getFrom(), packet.getSequence());
 			}
 			
 			current.removeFromWaitingForAckList(packet.getSequence());
