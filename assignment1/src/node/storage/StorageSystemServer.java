@@ -223,7 +223,7 @@ public class StorageSystemServer extends RPCNode {
 		// prints error
 		error(String.format("NODE %1: The connection to %2 timedout.", addr, endpoint));
 		
-		endCommand();
+		popCommandAndExecuteNext();
 	}	
 	
 	/**
@@ -256,7 +256,7 @@ public class StorageSystemServer extends RPCNode {
 				if (parts.length < 4)
 				{
 					warn(String.format("Invalid number of arguments for 'put' or 'append'. Expected at least 4. Found: %1", parts.length));
-					endCommand();
+					popCommandAndExecuteNext();
 				}
 				
 				StringBuilder contents = new StringBuilder();
@@ -295,7 +295,7 @@ public class StorageSystemServer extends RPCNode {
 		else
 		{
 			// Will remove this command from the queue and executes the next one, if any
-			endCommand();
+			popCommandAndExecuteNext();
 		}
 	}
 	
@@ -361,6 +361,9 @@ public class StorageSystemServer extends RPCNode {
 		if (params.size() == 2 && params.get(0).equals("error"))
 		{
 			error(String.format("NODE %d: %s", addr, params.get(1)));
+			info("Commands queued will be removed from list.");
+			this._commandQueue.clear();
+			return;
 		}		
 		else if (methodName.equals("endGetFile"))
 		{
@@ -368,7 +371,7 @@ public class StorageSystemServer extends RPCNode {
 		}
 		
 		// Will remove this command from the queue and executes the next one, if any
-		endCommand();
+		popCommandAndExecuteNext();
 	}
 	
 	private String readFileContents(String fileName)

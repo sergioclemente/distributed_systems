@@ -115,14 +115,13 @@ public class FacebookRPCNode extends RPCNode {
 		if (params.size() == 2 && params.get(0).equals("error"))
 		{
 			user_info(String.format("NODE %d: %s", this.addr, params.get(1)));
+			user_info("Commands queued will be removed from list.");
+			this._commandQueue.clear();
 		} else if (params.size() >= 1 && params.get(0).equals("ok")) {
 			String returnValue = params.size() == 2 ? params.get(1) : null;
-			
 			user_info("Server returned ok. returnValue=" + returnValue);
+			popCommandAndExecuteNext();
 		}
-		
-		// Will remove this command from the queue and executes the next one, if any
-		endCommand();
 	}
 	
 	@Override

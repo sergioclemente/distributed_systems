@@ -126,7 +126,7 @@ public class RPCNode extends ReliableDeliveryNode {
 	/**
 	 * Removes the current command from the queue and executes the next command, if there is one.
 	 */
-	protected void endCommand()
+	protected void popCommandAndExecuteNext()
 	{
 		// Removes the head
 		_commandQueue.remove();
