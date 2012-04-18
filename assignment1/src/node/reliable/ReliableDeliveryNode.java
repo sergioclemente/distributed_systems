@@ -15,7 +15,7 @@ public class ReliableDeliveryNode extends Node {
 	private Hashtable<Integer, Session> m_activeInSessions  = new Hashtable<Integer, Session>();
 
 	private final static int TIMEOUT = 3;
-	private final static int MAX_TIMEOUT = 9;
+	private final static int MAX_TIMEOUT = 3*TIMEOUT;
 
 	
 	public class PROTOCOLS {
@@ -162,7 +162,7 @@ public class ReliableDeliveryNode extends Node {
 			assert session.getSequence() == 0;
 			packet = Packet.Create(this.addr, targetNode, MESSAGE_TYPE.CONNECT, session.getConnectionId(), session.getSequence(), null);
 			session.addToWaitingForAckList(session.getSequence());
-			internalSendPacket(packet, TIMEOUT);
+			internalSendPacket(session, packet, TIMEOUT);
 			session.setConnecting();
 		}
 		
@@ -186,7 +186,7 @@ public class ReliableDeliveryNode extends Node {
 		{
 			// Connection already established, just send the packet
 			session.addToWaitingForAckList(session.getSequence());
-			internalSendPacket(packet, TIMEOUT);
+			internalSendPacket(session, packet, TIMEOUT);
 		}
 	}
 
@@ -201,15 +201,25 @@ public class ReliableDeliveryNode extends Node {
 		info("Connection aborted for endpoint " + endpoint);
 	}
 	
+	protected void onMessageTimeout(int endpoint) {
+		onConnectionAborted(endpoint);
+	}
+	
+	
 	/**
 	 * Attempts to send the given packet to the target node
 	 * @param packet
 	 */
-	private void internalSendPacket(Packet packet, int timeout) 
+	private void internalSendPacket(Session session, Packet packet, int timeout) 
 	{
 		Callback cb = new Callback(this.m_timeoutMethod, this, new Object[] { packet, timeout });
 		this.addTimeout(cb, timeout);
 
+		// Piggyback the smallest non-acknowledged sequence number, so that the receiver
+		// can detect aborted packets (due to timeout)
+		packet.setMinSequence(session.getMinimumPendingSequence());
+		
+		// Send the packet
 		info("Sending packet: " + packet.stringize());
 		this.send(packet.getTo(), PROTOCOLS.SCOP, packet.toByteArray());
 	}
@@ -258,12 +268,16 @@ public class ReliableDeliveryNode extends Node {
 			// Resend the packet if we didn't receive the ack yet
 			if (session.containsInWaitingForAckList(packet.getSequence())) 
 			{
-				if (currentTimeout.intValue() == MAX_TIMEOUT) {
-					this.internalSendReset(packet.getTo(), packet.getConnectionId(), packet.getSequence());
-					this.onConnectionAborted(packet.getTo());
-				} else {
+				if (currentTimeout.intValue() == MAX_TIMEOUT) 
+				{
+					info("Timeout: Aborting undelivered packet: " + packet.stringizeHeader());
+					this.onMessageTimeout(packet.getTo());
+					session.removeFromWaitingForAckList(packet.getSequence());
+				} 
+				else 
+				{
 					info("Timeout: Resending undelivered packet: " + packet.stringizeHeader());
-					this.internalSendPacket(packet, currentTimeout + TIMEOUT);
+					this.internalSendPacket(session, packet, currentTimeout + TIMEOUT);
 				}
 			}
 			else
@@ -285,7 +299,6 @@ public class ReliableDeliveryNode extends Node {
 				// This must be a timed out CONNECT packet
 				assert packet.getSequence() == 0;
 				assert packet.getType() == MESSAGE_TYPE.CONNECT;
-				
 				info("Cancelling connection attempt, connectionId=" + packet.getConnectionId());
 			}
 
@@ -301,14 +314,14 @@ public class ReliableDeliveryNode extends Node {
 				info("Dropping stale queued packet: " + queuedPacket.stringizeHeader());
 				
 				assert packet.getType() == MESSAGE_TYPE.DATA;
-				onConnectionAborted(packet.getTo());
+				onMessageTimeout(packet.getTo());
 			}
 
 			info("Dropping stale outbound packet: " + packet.stringizeHeader());
 			if (packet.getType() == MESSAGE_TYPE.DATA)
 			{
 				// Only notify upper layer of cancelled DATA packets
-				onConnectionAborted(packet.getTo());
+				onMessageTimeout(packet.getTo());
 			}
 		}
 	}
@@ -423,7 +436,7 @@ public class ReliableDeliveryNode extends Node {
 					dataPacket = current.getSendQueue().remove();
 					info("Sending queued packet: " + dataPacket.stringize());
 					current.addToWaitingForAckList(dataPacket.getSequence());
-					this.internalSendPacket(dataPacket, TIMEOUT);
+					this.internalSendPacket(current, dataPacket, TIMEOUT);
 				}
 			} else {
 				 // ACK for a data packet.
@@ -469,9 +482,13 @@ public class ReliableDeliveryNode extends Node {
 			// TODO: should not acknowledge received-but-undelivered packets
 			this.internalSendAck(packet.getFrom(), packet.getConnectionId(), packet.getSequence());
 			
+			int minSeq = packet.getSequence();
+			if (packet.getMinSequence() < minSeq)
+				minSeq = packet.getMinSequence();
+			
 			do
 			{
-				orderedPacket = current.getNextReceivePacket();
+				orderedPacket = current.getNextReceivePacket(minSeq);
 				if (orderedPacket != null)
 				{
 					info("Delivering ordered packet: " + orderedPacket.stringize());
@@ -508,25 +525,9 @@ public class ReliableDeliveryNode extends Node {
 			// later on, as they time out.
 			onConnectionAborted(packet.getFrom());
 		}
-		else
+		else 
 		{
-			current = getInboundByNode(packet.getFrom());
-			if (current != null && current.getConnectionId() == packet.getConnectionId()) {
-				
-				// Target node crashed and lost the current connection state
-				info("Received RESET packet for current connection: " + packet.stringizeHeader());
-				
-				// Forget the current session
-				current.setClosed();
-				m_activeInSessions.remove(packet.getFrom());
-				
-				// Tell upper layer that the connection was aborted.
-				// We'll notify the upper layer of the packets we couldn't send
-				// later on, as they time out.
-				onConnectionAborted(packet.getFrom());
-			} else {
-				info("Received stale RESET packet: " + packet.stringizeHeader());
-			}
+			info("Received stale RESET packet: " + packet.stringizeHeader());
 		}
 	}
 

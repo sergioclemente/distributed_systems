@@ -5,11 +5,13 @@ import util.ByteManipulator;
 
 public class Packet 
 {
+	private final static int	HEADER_LENGTH = 24; 
 	private int m_from;
 	private int m_to;
 	private int m_type;
 	private int m_connId;
 	private int m_seqNum;
+	private int m_minSeq;
 	private byte[] m_payload;
 	
 	/**
@@ -19,7 +21,7 @@ public class Packet
 	 */
 	public static Packet CreateFromBuffer(byte[] buffer) 
 	{
-		assert buffer.length >= 20;
+		assert buffer.length >= HEADER_LENGTH;
 		
 		Packet packet = new Packet();
 		packet.setFrom(ByteManipulator.getInt(buffer, 0));
@@ -27,11 +29,12 @@ public class Packet
 		packet.setType(ByteManipulator.getInt(buffer, 8));
 		packet.setConnectionId(ByteManipulator.getInt(buffer, 12));
 		packet.setSequence(ByteManipulator.getInt(buffer, 16));
+		packet.setMinSequence(ByteManipulator.getInt(buffer, 20));
 		
-		if (buffer.length > 20)
+		if (buffer.length > HEADER_LENGTH)
 		{
-			byte[] payload = new byte[buffer.length - 20];
-			System.arraycopy(buffer, 20, payload, 0, buffer.length-20);
+			byte[] payload = new byte[buffer.length - HEADER_LENGTH];
+			System.arraycopy(buffer, HEADER_LENGTH, payload, 0, buffer.length-HEADER_LENGTH);
 			packet.setPayload(payload);
 		}
 		
@@ -59,6 +62,7 @@ public class Packet
 		packet.setType(ptype);
 		packet.setConnectionId(connId);
 		packet.setSequence(seqNum);
+		packet.setMinSequence(0);
 		packet.setPayload(payload);
 		
 		return packet;
@@ -72,6 +76,7 @@ public class Packet
 		m_type	= -1;
 		m_connId = -1;
 		m_seqNum = -1;
+		m_minSeq = -1;
 		m_payload = null;
 	}
 	
@@ -116,6 +121,14 @@ public class Packet
 		m_seqNum = seqNum;
 	}
 
+	public int getMinSequence() {
+		return m_minSeq;
+	}
+	
+	public void setMinSequence(int value) {
+		m_minSeq = value;
+	}
+	
 	public byte[] getPayload() {
 		return m_payload;
 	}
@@ -126,7 +139,7 @@ public class Packet
 	
 	public byte[] toByteArray() {
 		byte[] buffer;
-		int length = 20;
+		int length = HEADER_LENGTH;
 		
 		if (m_payload != null) {
 			length += m_payload.length;
@@ -139,9 +152,10 @@ public class Packet
 		ByteManipulator.addInt(buffer, 8, m_type);
 		ByteManipulator.addInt(buffer, 12, m_connId); 
 		ByteManipulator.addInt(buffer, 16, m_seqNum);
+		ByteManipulator.addInt(buffer,  20, m_minSeq);
 		
 		if (m_payload != null) {
-			System.arraycopy(m_payload, 0, buffer, 20, m_payload.length);
+			System.arraycopy(m_payload, 0, buffer, HEADER_LENGTH, m_payload.length);
 		}
 
 		return buffer;
@@ -155,8 +169,8 @@ public class Packet
 			contentLength = m_payload.length;
 		}
 		
-		return String.format("[ from:%d, to:%d, type:%d, id:0x%08X, seq:0x%08X | dlen:%d, ... ]", 
- 							 m_from, m_to, m_type, m_connId, m_seqNum, contentLength);
+		return String.format("[ from:%d, to:%d, type:%d, id:0x%08X, seq:0x%08X, mseq=0x%08X | dlen:%d, ... ]", 
+ 							 m_from, m_to, m_type, m_connId, m_seqNum, m_minSeq, contentLength);
 	}
 	
 	public String stringize() {
@@ -169,7 +183,7 @@ public class Packet
 			contentLength = m_payload.length;
 		}
 		
-		return String.format("[ from:%d, to:%d, type:%d, id:0x%08X, seq:0x%08X | dlen:%d, data:'%s' ]", 
- 							 m_from, m_to, m_type, m_connId, m_seqNum, contentLength, content);
+		return String.format("[ from:%d, to:%d, type:%d, id:0x%08X, seq:0x%08X, mseq=0x%08X | dlen:%d, data:'%s' ]", 
+ 							 m_from, m_to, m_type, m_connId, m_seqNum, m_minSeq, contentLength, content);
 	}
 }
