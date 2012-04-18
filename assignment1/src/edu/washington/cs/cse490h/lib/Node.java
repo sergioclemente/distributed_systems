@@ -19,10 +19,10 @@ public abstract class Node {
 	 * The student may hide these by implementing static methods with the same
 	 * signature in their own node class. 0<=p<=1.
 	 */
-	public static double getFailureRate() { return 5 / 100.0; }
-	public static double getRecoveryRate() { return 10 / 100.0; }
-	public static double getDropRate() { return 10 / 100.0; }
-	public static double getDelayRate() { return 25 / 100.0; }
+	public static double getFailureRate() { return 5/100.0; }
+	public static double getRecoveryRate() { return 10/100.0; }
+	public static double getDropRate() { return 10/100.0; }
+	public static double getDelayRate() { return 25/100.0; }
 
 	/**
 	 * Special error that is thrown when fail() is called. It is an unchecked
@@ -47,7 +47,7 @@ public abstract class Node {
 	// There are two ways to handle this corner case:
 	// 1. be able to deliver messages in the same round that they are sent
 	// 2. include a drift event, which pushes back all subsequent time-based
-	//    events (timers and commands)
+	// events (timers and commands)
 	long drift;
 
 	/**
@@ -116,7 +116,8 @@ public abstract class Node {
 	 */
 	public void send(int destAddr, int protocol, byte[] payload) {
 		if (destAddr == Manager.BROADCAST_ADDRESS) {
-			System.err.println("Use the broadcast() method if you would like to broadcast a packet");
+			System.err
+			.println("Use the broadcast() method if you would like to broadcast a packet");
 			return;
 		}
 
@@ -184,7 +185,7 @@ public abstract class Node {
 	 *             If the file does not exist or can't be opened for reading
 	 */
 	public PersistentStorageReader getReader(String filename)
-			throws FileNotFoundException {
+	throws FileNotFoundException {
 		return new PersistentStorageReader(this, filename);
 	}
 
@@ -198,7 +199,7 @@ public abstract class Node {
 	 *             If the file does not exist or can't be opened for reading
 	 */
 	public PersistentStorageInputStream getInputStream(String filename)
-			throws FileNotFoundException {
+	throws FileNotFoundException {
 		return new PersistentStorageInputStream(this, filename);
 	}
 
@@ -215,9 +216,10 @@ public abstract class Node {
 	 *             If the file cannot be opened for writing
 	 */
 	public PersistentStorageWriter getWriter(String filename, boolean append)
-			throws IOException {
+	throws IOException {
 		if (!Utility.fileExists(this, filename) || !append) {
-			handleDiskWriteEvent("creation of " + filename, "create:" + filename);
+			handleDiskWriteEvent("creation of " + filename, "create:"
+					+ filename);
 		}
 		Utility.mkdirs(addr);
 		File f = new File(Utility.realFilename(addr, filename));
@@ -239,7 +241,8 @@ public abstract class Node {
 	public PersistentStorageOutputStream getOutputStream(String filename,
 			boolean append) throws IOException {
 		if (!Utility.fileExists(this, filename) || !append) {
-			handleDiskWriteEvent("creation of " + filename, "create:" + filename);
+			handleDiskWriteEvent("creation of " + filename, "create:"
+					+ filename);
 		}
 		Utility.mkdirs(addr);
 		File f = new File(Utility.realFilename(addr, filename));
@@ -321,8 +324,9 @@ public abstract class Node {
 	 *            the string representing this event
 	 */
 	final public void logSynopticEvent(String eventStr) {
-		String eventStrNoded = "node:" + toSynopticString() + " USER-EVENT " + eventStr;
-		manager.logEvent(addr, eventStrNoded);
+		String eventStrNoded = "node:" + toSynopticString() + " USER-EVENT "
+		+ eventStr;
+		manager.logEvent(this, eventStrNoded);
 	}
 
 }

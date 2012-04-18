@@ -3,8 +3,6 @@ package edu.washington.cs.cse490h.lib;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.UnknownHostException;
-import java.util.List;
-import java.util.Vector;
 
 import plume.Option;
 import plume.Options;
@@ -12,10 +10,9 @@ import plume.OptionGroup;
 
 import edu.washington.cs.cse490h.lib.Manager.FailureLvl;
 
-
 /**
  * <pre>
- *
+ * 
  * Class with main method that starts up a Manager. Either an Emulator or a Simulator
  *
  * Usage: java MessageLayer [options]
@@ -29,6 +26,7 @@ import edu.washington.cs.cse490h.lib.Manager.FailureLvl;
  *  -n --nodeClass=<string>                           - Node class to use [default ]
  *  --routerHostname=<string>                         - Router hostname [default localhost]
  *  --routerPort=<int>                                - Router port [default -1]
+ *  -a --nodeAddr=<int>                               - Node address [default -1]
  *  -t --timestep=<long>                              - Time step, in ms [default 1000]
  *  -r --seed=<long>                                  - Random seed
  *  -c --commandFile=<string>                         - Command file [default ]
@@ -40,14 +38,14 @@ import edu.washington.cs.cse490h.lib.Manager.FailureLvl;
  *  -o --replayOutputFilename=<string>                - Replay output filename [default ]
  *  --replayInputFilename=<string>                    - Replay input filename [default ]
  *
- * </pre>
+ * </pre>   
  */
 public class MessageLayer {
 
 	/**
 	 * The current version.
 	 */
-	public static final String versionString = "v0.2";
+	public static final String versionString = "v1.0";
 
 	////////////////////////////////////////////////////
 	/**
@@ -83,7 +81,7 @@ public class MessageLayer {
 	 * Node class to use for simulation\emulation
 	 */
 	@Option(value="-n Node class to use", aliases={"-node-cls"})
-	public static List<String> nodeClass = new Vector<String>();
+	public static String nodeClass = "";
 
 	/**
 	 * Router hostname
@@ -95,8 +93,11 @@ public class MessageLayer {
 	 * Router port
 	 */
 	@Option(value="Router port", aliases={"-router-port"})
-	// TODO: specify a sane default
+	// TODO: specify a sane default    
 	public static int routerPort = -1;
+	
+	@Option(value="-a Node address", aliases={"-node-address"}) 
+	public static int nodeAddr = -1;
 
 	/**
 	 * Time step
@@ -132,20 +133,20 @@ public class MessageLayer {
 	@Option(value="-L Synoptic totally ordered log filename", aliases={"-synoptic-totally-ordered-logfile"})
 	// TODO: specify a sane default
 	public static String synopticTotalOrderLogFilename = "";
-
+	
 	/**
 	 * The log filename for partially ordered synoptic output
 	 */
 	@Option(value="-l Synoptic partially ordered log filename", aliases={"-synoptic-partially-ordered-logfile"})
 	// TODO: specify a sane default
 	public static String synopticPartialOrderLogFilename = "";
-
+	
 	/**
 	 * The log filename for replay output
 	 */
 	@Option(value="-o Replay output filename", aliases={"-replay-outfile"})
 	public static String replayOutputFilename = "";
-
+	
 	/**
 	 * The log filename for replay input
 	 */
@@ -161,7 +162,7 @@ public class MessageLayer {
 
 	/**
 	 * Prints out an warning message
-	 *
+	 * 
 	 * @param msg warning msg string
 	 */
 	public static void printWarning(String msg) {
@@ -170,7 +171,7 @@ public class MessageLayer {
 
 	/**
 	 * Prints out an error message
-	 *
+	 * 
 	 * @param msg error msg string
 	 */
 	public static void printError(String msg) {
@@ -184,7 +185,7 @@ public class MessageLayer {
 	public static void main(String[] args) {
 		// this directly sets the static member options of the Main class
 		Options options = new Options (usage_string, MessageLayer.class);
-
+		
 		@SuppressWarnings("unused")
 		String[] cmdLineArgs = options.parse_or_usage(args);
 
@@ -203,7 +204,7 @@ public class MessageLayer {
 			return;
 		}
 
-		if (nodeClass.size() == 0) {
+		if (nodeClass.equals("")) {
 			printError("you must specify a node class with -n.");
 			return;
 		}
@@ -213,7 +214,7 @@ public class MessageLayer {
 		} else {
 			System.out.println("synopticTotalLogFilename = " + synopticTotalOrderLogFilename);
 		}
-
+		
 		if (synopticPartialOrderLogFilename.equals("")) {
 			//printWarning("you did not specify a partially ordered synoptic log file.");	// TODO: re-enable when it's working
 		} else {
@@ -231,17 +232,13 @@ public class MessageLayer {
 					FailureLvl.DELAY,      // 3
 					FailureLvl.EVERYTHING, // 4
 			};
-			failureLvl = possibleFailureLvls[failureLvlInt];
+			failureLvl = possibleFailureLvls[failureLvlInt];	
 		}
 
 		try {
 			Manager manager = null;
 
-			List<Class<? extends Node>> nodeImplList = new Vector<Class<? extends Node>>();
-
-			for (String nodeClassString : nodeClass) {
-				nodeImplList.add(ClassLoader.getSystemClassLoader().loadClass(nodeClassString).asSubclass(Node.class));
-			}
+			Class<? extends Node> nodeImpl = ClassLoader.getSystemClassLoader().loadClass(nodeClass).asSubclass(Node.class);
 
 			if (simulate) {
 				if(commandFile.equals("")) {
@@ -260,23 +257,30 @@ public class MessageLayer {
 
 				try {
 					if(!commandFile.equals("")){
-						manager = new Simulator(nodeImplList, failureLvl, seed, replayOutputFilename, replayInputFilename, commandFile);
+						manager = new Simulator(nodeImpl, failureLvl, seed, replayOutputFilename, replayInputFilename, commandFile);
 					} else {
-						manager = new Simulator(nodeImplList, failureLvl, seed, replayOutputFilename, replayInputFilename);
+						manager = new Simulator(nodeImpl, failureLvl, seed, replayOutputFilename, replayInputFilename);
 					}
 				} catch (IllegalArgumentException e) {
 					printError("Illegal arguments given to Simulator. Exception: " + e);
 					return;
 				} catch (FileNotFoundException e) {
-					printError("Incorrect command file name given to Simulator. Exception: " + e);
+					printError("Incorrect command file name given to Simulator. Exception: " + e);		    
 					return;
 				}
 
 
 			} else { //emulate
-				if (routerHostname == "" || routerPort == -1) {
-					printError("For an emulation you must specify router hostname/port");
-					return;
+				if (replayInputFilename.equals("")) {
+					if (routerHostname == "" || routerPort == -1) {
+						printError("For an emulation without replay, you must specify router hostname/port");
+						return;
+					}
+
+					if (nodeAddr == -1) {
+						printError("For an emulation without replay, you must specify a node address");
+						return;
+					}
 				}
 
 				if (replayOutputFilename.equals("") && replayInputFilename.equals("")) {
@@ -291,11 +295,10 @@ public class MessageLayer {
 				}
 
 				try {
-					// TODO: Emulator not supporting multiple node types
 					if (!commandFile.equals("")) {
-						manager = new Emulator(nodeImplList.get(0), routerHostname, routerPort, failureLvl, seed, timestep, replayOutputFilename, replayInputFilename, commandFile);
+						manager = new Emulator(nodeImpl, nodeAddr, routerHostname, routerPort, failureLvl, seed, timestep, replayOutputFilename, replayInputFilename, commandFile);
 					} else {
-						manager = new Emulator(nodeImplList.get(0), routerHostname, routerPort, failureLvl, seed, timestep, replayOutputFilename, replayInputFilename);
+						manager = new Emulator(nodeImpl, nodeAddr, routerHostname, routerPort, failureLvl, seed, timestep, replayOutputFilename, replayInputFilename);
 					}
 				} catch(UnknownHostException e) {
 					printError("Router host name is unkown! Exception: " + e);
