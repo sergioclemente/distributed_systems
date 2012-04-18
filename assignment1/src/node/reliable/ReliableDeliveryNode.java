@@ -198,7 +198,7 @@ public class ReliableDeliveryNode extends Node {
 	 * @param endpoint
 	 */
 	protected void onConnectionAborted(int endpoint) {
-		info("Connection closed for endpoint " + endpoint);
+		info("Connection aborted for endpoint " + endpoint);
 	}
 	
 	/**
@@ -510,7 +510,23 @@ public class ReliableDeliveryNode extends Node {
 		}
 		else
 		{
-			info("Received stale RESET packet: " + packet.stringizeHeader());
+			current = getInboundByNode(packet.getFrom());
+			if (current != null && current.getConnectionId() == packet.getConnectionId()) {
+				
+				// Target node crashed and lost the current connection state
+				info("Received RESET packet for current connection: " + packet.stringizeHeader());
+				
+				// Forget the current session
+				current.setClosed();
+				m_activeInSessions.remove(packet.getFrom());
+				
+				// Tell upper layer that the connection was aborted.
+				// We'll notify the upper layer of the packets we couldn't send
+				// later on, as they time out.
+				onConnectionAborted(packet.getFrom());
+			} else {
+				info("Received stale RESET packet: " + packet.stringizeHeader());
+			}
 		}
 	}
 
