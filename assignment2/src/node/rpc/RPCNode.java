@@ -13,37 +13,14 @@ import edu.washington.cs.cse490h.lib.Utility;
 public class RPCNode extends ReliableDeliveryNode {	
 	private static final String TEMP_FILE = ".temp";
 	
-	protected Queue<String> _commandQueue;
-	
 	public RPCNode()
 	{
-		_commandQueue = new LinkedList<String>();
-	}
-	
-	/**
-	 * Parses the commands sent to the client by the simulator or the emulator.
-	 */
-	@Override
-	public void onCommand(String command)
-	{
-		// If this is the server, it doesn't handle onCommand.
-		if (isServer()) 
-			return;
-		
-		_commandQueue.add(command);
-		
-		// If the _commandQueue was empty, execute the command now.
-		// Otherwise it'll be executed when the current command finishes.
-		if (_commandQueue.size() == 1)
-		{
-			executeClientCommand(command);
-		}								
 	}
 	
 	@Override
 	public void start() {
 		super.start();
-		this.recoverFromCrash();
+		this.recoverTempFileFromCrash();
 	}
 
 	/**
@@ -122,38 +99,6 @@ public class RPCNode extends ReliableDeliveryNode {
 
 		return methodCall;
 	}
-
-	/**
-	 * Removes the current command from the queue and executes the next command, if there is one.
-	 */
-	protected void popCommandAndExecuteNext()
-	{
-		// Removes the head
-		_commandQueue.remove();
-		
-		// Gets the next element in the queue (new head) and executes it
-		String command = _commandQueue.peek();		
-		if (command != null)
-		{
-			executeClientCommand(command);
-		}
-	}
-	
-	protected void executeClientCommand(String command)
-	{
-	}
-	
-	
-	/**
-	 * Because the framework doesn't allow us to have two different types running at the same time, we need to implement
-	 * both client and server together.
-	 * 
-	 * To differentiate between one and another, we are assuming that the server has a addr = 0.
-	 */
-	protected boolean isServer()
-	{
-		return addr == 0;
-	}
 	
 	/**
 	 * Sub classes will call this method in order to store files on disk. it already takes care of crashes
@@ -195,7 +140,7 @@ public class RPCNode extends ReliableDeliveryNode {
 		}
 	}
 	
-	private void recoverFromCrash() {
+	private void recoverTempFileFromCrash() {
 		try {
 			if (Utility.fileExists(this, TEMP_FILE)) {
 				PersistentStorageReader psw_bck = this.getReader(TEMP_FILE);
