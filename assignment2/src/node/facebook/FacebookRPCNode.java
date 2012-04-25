@@ -1,12 +1,14 @@
 package node.facebook;
 
 import java.util.Vector;
+
+import node.rpc.RPCMethodCall;
 import node.rpc.RPCNode;
 
 
 public class FacebookRPCNode extends RPCNode {
 
-	private FacebookSystem m_system;
+	private BaseFacebookSystem m_system;
 	
 	private final static int FRONTEND_ADDRESS = 0;
 	private final static int NUMBER_OF_SHARDS = 5;
@@ -25,136 +27,94 @@ public class FacebookRPCNode extends RPCNode {
 	public void start() {
 		super.start();
 		
-		this.m_system = new FacebookSystem(this);
-		this.m_system.recoverFromCrash();
-	}
-	 
-	@Override
-	protected void onMethodCalled(int from, String methodName, Vector<String> params) {
-		
-	}
-	
-	// Server part due to limitation of the framework
-	private void executeServerCommand(int from, String methodName,
-			Vector<String> params) {
-		Vector<String> returnParams = new Vector<String>();
-		String returnMethodName = "status_call";
-		
-		try {
-			String returnValue = null;
-			
-			if (methodName.startsWith("create_user")) {
-				this.m_system.createUser(params.get(0), params.get(1));
-			} else if (methodName.startsWith("login")) {
-				returnValue = this.m_system.login(params.get(0), params.get(1));
-			} else if (methodName.startsWith("logout")) {
-				this.m_system.logout(params.get(0));
-			} else if (methodName.startsWith("add_friend")) {
-				this.m_system.addFriend(params.get(0), params.get(1));
-			} else if (methodName.startsWith("accept_friend")) {
-				this.m_system.acceptFriend(params.get(0), params.get(1));
-			} else if (methodName.startsWith("write_message_all")) { 
-				this.m_system.writeMessagesAll(params.get(0), params.get(1));
-			} else if (methodName.startsWith("read_message_all")) {
-				returnValue = this.m_system.readMessagesAll(params.get(0));
-			} else {
-				throw new FacebookException(FacebookException.INVALID_FACEBOOK_METHOD);
-			}
-			
-			returnParams.add("ok");
-			if (returnValue != null) {
-				returnParams.add(returnValue);
-			}
-		} catch (FacebookException e) {
-			returnParams.add("error");
-			returnParams.add(String.format(ERROR_MESSAGE_FORMAT, methodName, this.addr, e.getExceptionCode()));
+		if (this.addr == FRONTEND_ADDRESS) {
+			this.info("Starting frontend instance on address " + this.addr);
+			this.m_system = new FacebookFrontendSystem(this);
+		} else {
+			this.info("Starting sharding instance on address " + this.addr);
+			this.m_system = new FacebookShardSystem(this);
 		}
 		
-		this.callMethod(from, returnMethodName, returnParams);		
+		this.m_system.recoverFromCrash();
 	}
-
-
-	// Client part due to limitation of the framework
+	
 	@Override
 	public void onCommand(String command)
 	{
-		if (this.isFrontEnd()) {
-			String[] parts = command.split("\\s+");
-			
-			String methodName = parts[0];
-			
-			Vector<String> params = new Vector<String>();
-			
-			if (methodName.startsWith("write_message_all")) {
-				int idx = command.indexOf(' ');
-				int nextIdx = command.indexOf(' ', idx+1);
-				
-				if (idx != -1 && nextIdx != -1) {
-					String token = command.substring(idx, nextIdx).trim();
-					String msg = command.substring(nextIdx, command.length()).trim();
-					params.add(token);
-					params.add(msg);
-				}
-			} else {
-				for (int i = 1; i < parts.length; i++) {
-					params.add(parts[i]);
-				}
-			}
-			
-			if (isLocalCommand(methodName)) {
-				// Simulate an RPC
-				onMethodCalled(0, methodName, params);
-			} else {
-				executeOnCommand(methodName, params);	
-			}
-		}
-	}
-	
-	private void executeOnCommand(String methodName, Vector<String> params) {
+		// TODO: the queuing logic is not in place
 		try {
-			String tokenId = params.get(0);
+			RPCMethodCall methodCall = this.m_system.parseRPCMethodCall(command);
 			
-			User user = this.m_system.getUser(tokenId);
-			
-			// Replace the argument
-			params.set(0, user.getLogin());
-
-			this.callMethod(0, methodName, params);	
+			// If this node is the frontend?
+			if (this.isFrontEnd()) {
+				// Can the frontend handle this command?
+				if (this.m_system.canCallLocalMethod(methodCall.getMethodName(), methodCall.getParams())) {
+					this.m_system.callLocalMethod(methodCall.getMethodName(), methodCall.getParams());
+				} else {
+					this.routeToAppropriateShards(methodCall.getMethodName(), methodCall.getParams());
+				}
+			} else {
+				// Shards are currently not supporting commands
+				throw new FacebookException(FacebookException.CANNOT_EXECUTE_COMMANDS_ON_SHARDS);
+			}
 		} catch (FacebookException ex) {
-			
+			ex.printStackTrace();
 		}
+	}
+	
+	private void routeToAppropriateShards(String methodName, Vector<String> params) throws FacebookException {
+		String userId = params.get(0);
 		
-	}
-
-	private int mapUserToShardId(String userId) {
-		return userId.hashCode() % NUMBER_OF_SHARDS;
+		// Validate the session
+		FacebookFrontendSystem frontendSystem = (FacebookFrontendSystem)this.m_system;
+		String token = params.get(0);
+		User user = frontendSystem.getUser(token);
+		
+		// Update the first argument from token to user
+		params.set(0, user.getLogin());
+		
+		// write_message_all will broadcast to all shards
+		if (methodName.startsWith("write_message_all")) {
+			for (int i = FRONTEND_ADDRESS+1; i < FRONTEND_ADDRESS+1+NUMBER_OF_SHARDS; i++){
+				this.callMethod(i, methodName, params);
+			}			
+		} else {
+			// read_message_all will read from a specific shard
+			int shardAddress =  userId.hashCode() % NUMBER_OF_SHARDS;
+			this.callMethod(shardAddress, methodName, params);
+		}
 	}
 	
-	private boolean isLocalCommand(String methodName) {
-		return methodName.equals("create_user") || 
-				methodName.equals("login") || 
-				methodName.equals("logout");
-	}
-
-	private void user_info(String s) {
-		// Use a different prefix to be easy to distinguish
-		System.out.println(">>>> " + s);
-	}
-	
-	private void onEndCommand(int from, String methodName, Vector<String> params)
-	{
-		if (params.size() == 2 && params.get(0).equals("error"))
-		{
-			user_info(String.format("NODE %d: %s", this.addr, params.get(1)));
-			user_info("Commands queued will be removed from list.");
-		} else if (params.size() >= 1 && params.get(0).equals("ok")) {
-			String returnValue = params.size() == 2 ? params.get(1) : null;
-			user_info("Server returned ok. returnValue=" + returnValue);
+	@Override
+	protected void onMethodCalled(int from, String methodName, Vector<String> params) {
+		try {
+			if (this.isFrontEnd()) {
+				// TODO: do a better job here on handling
+				this.m_system.info("Receive return from shard");
+				for (int i = 0; i < params.size(); i++) {
+					System.out.println(params.get(i));
+				}
+				
+				// TODO: do not have logic of waiting for all shards in order to send next command
+			} else {
+				assert this.m_system.canCallLocalMethod(methodName, params);
+				String returnValue = this.m_system.callLocalMethod(methodName, params);
+				Vector<String> returnParams = new Vector<String>();
+				returnParams.add("ok");
+				returnParams.add(returnValue);
+				this.callMethod(from, methodName, returnParams);
+			}
+		} catch (FacebookException ex) {
+			Vector<String> returnParams = new Vector<String>();
+			returnParams.add("error");
+			returnParams.add(new Integer(ex.getExceptionCode()).toString());
+			
+			this.callMethod(from, methodName, returnParams);
 		}
 	}
 	
 	@Override
 	protected void onConnectionAborted(int endpoint) {
-		
+		this.m_system.info("connection aborted!");
 	}
 }
