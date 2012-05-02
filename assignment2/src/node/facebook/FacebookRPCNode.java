@@ -11,7 +11,7 @@ public class FacebookRPCNode extends RPCNode {
 	private BaseFacebookSystem m_system;
 	
 	private final static int FRONTEND_ADDRESS = 0;
-	private final static int NUMBER_OF_SHARDS = 5;
+	private final static int[] SHARDS_ADDRESSES = new int[] {1,2,3,4,5};
 	
 	private static final String ERROR_MESSAGE_FORMAT = 
 			"Error: %s on facebook server %d. Returned error code was %s";
@@ -62,9 +62,7 @@ public class FacebookRPCNode extends RPCNode {
 		}
 	}
 	
-	private void routeToAppropriateShards(String methodName, Vector<String> params) throws FacebookException {
-		String userId = params.get(0);
-		
+	private void routeToAppropriateShards(String methodName, Vector<String> params) throws FacebookException {		
 		// Validate the session
 		FacebookFrontendSystem frontendSystem = (FacebookFrontendSystem)this.m_system;
 		String token = params.get(0);
@@ -75,12 +73,12 @@ public class FacebookRPCNode extends RPCNode {
 		
 		// write_message_all will broadcast to all shards
 		if (methodName.startsWith("write_message_all")) {
-			for (int i = FRONTEND_ADDRESS+1; i < FRONTEND_ADDRESS+1+NUMBER_OF_SHARDS; i++){
-				this.callMethod(i, methodName, params);
+			for (int shardAddr : SHARDS_ADDRESSES) {
+				this.callMethod(shardAddr, methodName, params);
 			}			
 		} else {
 			// read_message_all will read from a specific shard
-			int shardAddress =  userId.hashCode() % NUMBER_OF_SHARDS;
+			int shardAddress =  user.getLogin().hashCode() % SHARDS_ADDRESSES.length;
 			this.callMethod(shardAddress, methodName, params);
 		}
 	}
@@ -89,27 +87,33 @@ public class FacebookRPCNode extends RPCNode {
 	protected void onMethodCalled(int from, String methodName, Vector<String> params) {
 		try {
 			if (this.isFrontEnd()) {
-				// TODO: do a better job here on handling
-				this.m_system.info("Receive return from shard");
-				for (int i = 0; i < params.size(); i++) {
-					System.out.println(params.get(i));
+				if (methodName.equals("endCallback")) {
+					// TODO: do a better job here on handling multiple values
+					this.m_system.info("Receive return from shard");
+					for (int i = 0; i < params.size(); i++) {
+						System.out.println(params.get(i));
+					}
+					
+					// TODO: do not have logic of waiting for all shards in order to send next command
+				} else {
+					// TODO: not sure yet if need this since it would need 3 types of nodes to exercise this codepath
 				}
-				
-				// TODO: do not have logic of waiting for all shards in order to send next command
 			} else {
 				assert this.m_system.canCallLocalMethod(methodName, params);
 				String returnValue = this.m_system.callLocalMethod(methodName, params);
 				Vector<String> returnParams = new Vector<String>();
+				returnParams.add(methodName);
 				returnParams.add("ok");
 				returnParams.add(returnValue);
-				this.callMethod(from, methodName, returnParams);
+				this.callMethod(from, "endCallback", returnParams);
 			}
 		} catch (FacebookException ex) {
 			Vector<String> returnParams = new Vector<String>();
+			returnParams.add(methodName);
 			returnParams.add("error");
 			returnParams.add(new Integer(ex.getExceptionCode()).toString());
 			
-			this.callMethod(from, methodName, returnParams);
+			this.callMethod(from, "endCallback", returnParams);
 		}
 	}
 	

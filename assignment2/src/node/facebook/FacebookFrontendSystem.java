@@ -18,7 +18,7 @@ public class FacebookFrontendSystem extends BaseFacebookSystem {
 	private Hashtable<String, String> m_activeSessions = new Hashtable<String, String>();
 	private Hashtable<String, List<String>> m_friends = new Hashtable<String, List<String>>();
 	private Hashtable<String, List<String>> m_friendRequests = new Hashtable<String, List<String>>();
-	
+
 	public FacebookFrontendSystem(FacebookRPCNode node) {
 		super(node);
 	}
@@ -61,7 +61,9 @@ public class FacebookFrontendSystem extends BaseFacebookSystem {
 		return null;
 	}
 	
-	public String addFriend(String login, String friendLogin) throws FacebookException {		
+	public String addFriend(String token, String friendLogin) throws FacebookException {
+		String login = this.getUser(token).getLogin();
+		
 		if (!this.isValidUser(friendLogin)) {
 			throw new FacebookException(FacebookException.USER_DONT_EXIST);
 		}
@@ -81,7 +83,9 @@ public class FacebookFrontendSystem extends BaseFacebookSystem {
 	}
 	
 
-	public String acceptFriend(String login, String friendLogin) throws FacebookException {
+	public String acceptFriend(String token, String friendLogin) throws FacebookException {
+		String login = this.getUser(token).getLogin();
+		
 		if (!this.isValidUser(friendLogin)) {
 			throw new FacebookException(FacebookException.USER_DONT_EXIST);
 		}
@@ -92,7 +96,7 @@ public class FacebookFrontendSystem extends BaseFacebookSystem {
 		User friendUser;
 		friendUser = this.m_users.get(friendLogin);
 		
-		if (!requestList.contains(friendUser)) {
+		if (!requestList.contains(friendLogin)) {
 			// Can't accept friendship of somebody who hasn't requested it
 			throw new FacebookException(FacebookException.INVALID_REQUEST);
 		}
@@ -138,6 +142,11 @@ public class FacebookFrontendSystem extends BaseFacebookSystem {
 	}
 	
 	public User getUser(String token) throws FacebookException {
+		// In recovery the parameter actually will be the login
+		if (this.m_inRecovery) {
+			return this.m_users.get(token); 
+		}
+		
 		if (this.isLoggedIn(token)) {
 			String login = this.m_activeSessions.get(token);
 			return this.m_users.get(login);
@@ -149,6 +158,10 @@ public class FacebookFrontendSystem extends BaseFacebookSystem {
 	protected String callLocalMethod(String methodCall, Vector<String> params) throws FacebookException {		
 		if (methodCall.startsWith("create_user")) {
 			return this.createUser(params.get(0), params.get(1));
+		} else if (methodCall.startsWith("login")) {
+			return this.login(params.get(0), params.get(1));
+		} else if (methodCall.startsWith("logout")) {
+			return this.logout(params.get(0));
 		} else if (methodCall.startsWith("add_friend")) {
 			return this.addFriend(params.get(0), params.get(1));
 		} else if (methodCall.startsWith("accept_friend")) {
@@ -156,9 +169,8 @@ public class FacebookFrontendSystem extends BaseFacebookSystem {
 		} else {
 			return null;
 		}
-		
 	}
-
+	
 	@Override
 	protected boolean canCallLocalMethod(String methodCall, Vector<String> params) {
 		return methodCall.equals("create_user") || 

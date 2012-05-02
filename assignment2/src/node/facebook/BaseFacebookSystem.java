@@ -11,7 +11,7 @@ import edu.washington.cs.cse490h.lib.Utility;
 public abstract class BaseFacebookSystem {
 	private static final String FILE_NAME = "facebookdb.txt";
 
-	private boolean m_inRecovery = false;
+	protected boolean m_inRecovery = false;
 	private FacebookRPCNode m_node;
 	
 	public BaseFacebookSystem(FacebookRPCNode node) {
