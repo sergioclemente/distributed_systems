@@ -12,7 +12,7 @@ public class FacebookException extends RPCException {
 	
 	public FacebookException(int exceptionCode)
 	{
-		super(RPCException.RPC_ERROR_CLASS_CLIENT, exceptionCode);
+		super(RPCException.ERROR_CLASS_CLIENT, exceptionCode);
 	}
 
 }

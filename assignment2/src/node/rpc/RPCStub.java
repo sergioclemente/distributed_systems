@@ -1,13 +1,15 @@
 package node.rpc;
-
+import java.lang.reflect.Method;
 import java.util.Vector;
 import java.util.Hashtable;
+import edu.washington.cs.cse490h.lib.Callback;
 
 public abstract class RPCStub  
 {
+	protected static Integer s_replyId = 0;
 	protected RPCNode m_node;
 	protected int m_addr;
-	protected static Integer s_replyId = 0;
+	private Method m_timeoutMethod;
 	private Hashtable<Integer, String> m_pendingReplies = new Hashtable<Integer, String>();
 	
 	/**
@@ -17,6 +19,12 @@ public abstract class RPCStub
 	{
 		m_node = node;
 		m_addr = remoteAddress;
+		
+		try {
+			m_timeoutMethod = Callback.getMethod("onInvokeTimeout", this, new String[] { "java.lang.Integer" });
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 	
 	public int getCurrentReplyId()
@@ -55,6 +63,10 @@ public abstract class RPCStub
 		m_node.callMethod(m_addr, methodName, methodArgs, s_replyId, this);
 		m_pendingReplies.put(s_replyId, methodName);
 		
+		// Wait up to 9 ticks for an RPC reply to arrive
+		Callback cb = new Callback(m_timeoutMethod, this, new Object[] { s_replyId });
+		m_node.addTimeout(cb, 9);
+		
 		return s_replyId;
 	}
 	
@@ -73,6 +85,17 @@ public abstract class RPCStub
 		}
 	}
 	
+	public void onInvokeTimeout(Integer replyId)
+	{
+		if (m_pendingReplies.containsKey(replyId))
+		{
+			// If this reply is still pending, it means we haven't got an
+			// answer for the RPC call in the past 9 ticks, so fake an
+			// answer with a timeout error.
+			int error = RPCException.packErrorCode(RPCException.ERROR_CLASS_PROTOCOL, RPCException.ERROR_PROTOCOL_TIMEOUT);
+			onMethodReply(m_addr, replyId, error, "<null>");
+		}
+	}
 	
 	protected abstract void dispatchReply(int replyId, String methodName, int sender, int result, String content);
 }

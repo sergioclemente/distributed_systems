@@ -80,6 +80,7 @@ public class FacebookRPCNode extends RPCNode {
 			} else {
 				// select a shard based on the user's login hash
 				//int shardAddress =  user.getLogin().hashCode() % SHARDS_ADDRESSES.length;
+				
 				int shardAddress;
 				shardAddress = token.toLowerCase().hashCode();
 				shardAddress = shardAddress % SHARDS_ADDRESSES.length;
