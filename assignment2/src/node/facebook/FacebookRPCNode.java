@@ -7,40 +7,42 @@ import node.rpc.RPCNode;
 
 
 public class FacebookRPCNode extends RPCNode {
-
-	private BaseFacebookSystem m_system;
+	private FacebookShardSystem m_system;
+	private FacebookFrontendSystem m_client;
 	
-	private final static int FRONTEND_ADDRESS = 0;
-	private final static int[] SHARDS_ADDRESSES = new int[] {1,2,3,4,5};
+	private final static int[] SHARDS_ADDRESSES = new int[] {0,1,2,3,4,5};
 	
-	private static final String ERROR_MESSAGE_FORMAT = 
+	public static final String ERROR_MESSAGE_FORMAT = 
 			"Error: %s on facebook server %d. Returned error code was %s";
 	
 	public FacebookRPCNode() {
+		super();
 	}
 	
-	private boolean isFrontEnd() {
-		return this.addr == FRONTEND_ADDRESS;
-	}
 	
 	@Override
 	public void start() {
 		super.start();
 		
-		if (this.addr == FRONTEND_ADDRESS) {
-			this.info("Starting frontend instance on address " + this.addr);
-			this.m_system = new FacebookFrontendSystem(this);
-		} else {
-			this.info("Starting sharding instance on address " + this.addr);
-			this.m_system = new FacebookShardSystem(this);
-		}
+		this.info("Starting frontend instance on address " + this.addr);
+		this.m_client = new FacebookFrontendSystem(this);
+
+		this.info("Starting sharding instance on address " + this.addr);
+		this.m_system = new FacebookShardSystem(this);
+
+		// Enable this node to receive RPC calls for these interfaces
+		this.bindFacebookServerImpl(m_system);
 		
+		// Replay the file in memory
 		this.m_system.recoverFromCrash();
 	}
 	
 	@Override
 	public void onCommand(String command)
 	{
+		m_client.onCommand(command);
+		
+		/*
 		// TODO: the queuing logic is not in place
 		try {
 			RPCMethodCall methodCall = this.m_system.parseRPCMethodCall(command);
@@ -60,9 +62,38 @@ public class FacebookRPCNode extends RPCNode {
 		} catch (FacebookException ex) {
 			ex.printStackTrace();
 		}
+		*/
 	}
 	
-	private void routeToAppropriateShards(String methodName, Vector<String> params) throws FacebookException {		
+	public int[] getAppropriateShards(String methodName, String token) {
+		User user = null;
+		int[] shards;
+		
+		//try
+		{
+			// Validate the session
+			//m_system.getUser(token);
+
+			// write_message_all will broadcast to all shards
+			if (methodName.startsWith("write_message_all")) {
+				shards = SHARDS_ADDRESSES;
+			} else {
+				// select a shard based on the user's login hash
+				//int shardAddress =  user.getLogin().hashCode() % SHARDS_ADDRESSES.length;
+				int shardAddress;
+				shardAddress = token.toLowerCase().hashCode();
+				shardAddress = shardAddress % SHARDS_ADDRESSES.length;
+				shards = new int[] { shardAddress };
+			}
+		}
+		//catch (FacebookException ex)
+		//{
+		//	shards = new int[] {};
+		//}
+		
+		return shards;
+		
+		/*
 		// Validate the session
 		FacebookFrontendSystem frontendSystem = (FacebookFrontendSystem)this.m_system;
 		String token = params.get(0);
@@ -81,8 +112,10 @@ public class FacebookRPCNode extends RPCNode {
 			int shardAddress =  user.getLogin().hashCode() % SHARDS_ADDRESSES.length;
 			this.callMethod(shardAddress, methodName, params);
 		}
+		*/
 	}
 	
+	/*
 	@Override
 	protected void onMethodCalled(int from, String methodName, Vector<String> params) {
 		try {
@@ -116,9 +149,10 @@ public class FacebookRPCNode extends RPCNode {
 			this.callMethod(from, "endCallback", returnParams);
 		}
 	}
+	*/
 	
 	@Override
 	protected void onConnectionAborted(int endpoint) {
-		this.m_system.info("connection aborted!");
+		this.m_system.user_info("connection aborted!");
 	}
 }

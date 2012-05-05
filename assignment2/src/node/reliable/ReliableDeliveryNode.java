@@ -5,6 +5,7 @@ import edu.washington.cs.cse490h.lib.Node;
 import edu.washington.cs.cse490h.lib.Utility;
 import java.lang.reflect.Method;
 import java.util.*;
+import settings.MessagingSettings;
 
 
 public class ReliableDeliveryNode extends Node {
@@ -14,10 +15,6 @@ public class ReliableDeliveryNode extends Node {
 	private Hashtable<Integer, Session> m_activeOutSessions = new Hashtable<Integer, Session>();
 	private Hashtable<Integer, Session> m_activeInSessions  = new Hashtable<Integer, Session>();
 
-	private final static int TIMEOUT = 3;
-	private final static int MAX_TIMEOUT = 3*TIMEOUT;
-
-	
 	public class PROTOCOLS {
 		public final static int UNKNOWN = 0;
 		public final static int SCOP 	= 1;		// Simple connection oriented protocol
@@ -109,21 +106,33 @@ public class ReliableDeliveryNode extends Node {
 	}
 
 
-	protected void error(String msg) {
-		// Put some markers in the beginning so we can easily distinguish between system messages
-		System.out.println(String.format("*** %d: ERR: %s", this.addr, msg));
+	public void error(String msg) 
+	{
+		if (!MessagingSettings.SuppressErrorSpew)
+		{
+			// Put some markers in the beginning so we can easily distinguish between system messages
+			System.out.println(String.format("*** %d: ERR: %s", this.addr, msg));
+		}
 	}
 
 	
-	protected void warn(String msg) {
-		// Put some markers in the beginning so we can easily distinguish between system messages
-		System.out.println(String.format("*** %d: WRN: %s", this.addr, msg));
+	public void warn(String msg) 
+	{
+		if (!MessagingSettings.SuppressWarningSpew)
+		{
+			// Put some markers in the beginning so we can easily distinguish between system messages
+			System.out.println(String.format("*** %d: WRN: %s", this.addr, msg));
+		}
 	}
 
 	
-	protected void info(String msg) {
-		// Put some markers in the beginning so we can easily distinguish between system messages
-		System.out.println(String.format("*** %d: INF: %s", this.addr, msg));
+	public void info(String msg) 
+	{
+		if (!MessagingSettings.SuppressInfoSpew)
+		{
+			// Put some markers in the beginning so we can easily distinguish between system messages
+			System.out.println(String.format("*** %d: INF: %s", this.addr, msg));
+		}
 	}
 
 	
@@ -162,7 +171,7 @@ public class ReliableDeliveryNode extends Node {
 			assert session.getSequence() == 0;
 			packet = Packet.Create(this.addr, targetNode, MESSAGE_TYPE.CONNECT, session.getConnectionId(), session.getSequence(), null);
 			session.addToWaitingForAckList(session.getSequence());
-			internalSendPacket(session, packet, TIMEOUT);
+			internalSendPacket(session, packet, MessagingSettings.Timeout);
 			session.setConnecting();
 		}
 		
@@ -186,25 +195,57 @@ public class ReliableDeliveryNode extends Node {
 		{
 			// Connection already established, just send the packet
 			session.addToWaitingForAckList(session.getSequence());
-			internalSendPacket(session, packet, TIMEOUT);
+			internalSendPacket(session, packet, MessagingSettings.Timeout);
 		}
 	}
 
 	
 	/**
+	 * onConnectionAborted()
+	 * 
 	 * This message is called when the transport layer fails to establish the
 	 * connection to the target endpoint.
 	 * TODO: should provide more info to the upper layer. 
 	 * @param endpoint
 	 */
-	protected void onConnectionAborted(int endpoint) {
+	protected void onConnectionAborted(int endpoint) 
+	{
 		info("Connection aborted for endpoint " + endpoint);
 	}
 	
-	protected void onMessageTimeout(int endpoint) {
-		onConnectionAborted(endpoint);
+	
+	/**
+	 * onPacketTimeout()
+	 * 
+	 * @param endpoint
+	 * @param payload
+	 */
+	private void onPacketTimeout(Packet packet) 
+	{
+		int endpoint = packet.getFrom();
+		int type = packet.getType();
+		byte[] payload = packet.getPayload();
+		
+		info("Message timeout for endpoint " + endpoint);
+		
+		if (type == MESSAGE_TYPE.DATA)
+		{
+			onMessageTimeout(endpoint, payload);
+		}
 	}
 	
+	/**
+	 * onMessageTimeout()
+	 * Called whenever a DATA packet times out during transmission.
+	 * Upper layers should not be concerned about non-DATA packets.
+	 * 
+	 * @param endpoint
+	 * @param payload
+	 */
+	protected void onMessageTimeout(int endpoint, byte[] payload)
+	{
+	}
+
 	
 	/**
 	 * Attempts to send the given packet to the target node
@@ -268,16 +309,25 @@ public class ReliableDeliveryNode extends Node {
 			// Resend the packet if we didn't receive the ack yet
 			if (session.containsInWaitingForAckList(packet.getSequence())) 
 			{
-				if (currentTimeout.intValue() == MAX_TIMEOUT) 
+				if (currentTimeout.intValue() == MessagingSettings.MaxTimeout) 
 				{
 					info("Timeout: Aborting undelivered packet: " + packet.stringizeHeader());
-					this.onMessageTimeout(packet.getTo());
+					this.onPacketTimeout(packet);
 					session.removeFromWaitingForAckList(packet.getSequence());
+
+					// Cancel any queued packets
+					while (!session.getSendQueue().isEmpty())
+					{
+						Packet queuedPacket = session.getSendQueue().remove();
+						info("Dropping stale queued packet: " + queuedPacket.stringizeHeader());
+						assert queuedPacket.getType() == MESSAGE_TYPE.DATA;
+						onPacketTimeout(queuedPacket);
+					}
 				} 
 				else 
 				{
 					info("Timeout: Resending undelivered packet: " + packet.stringizeHeader());
-					this.internalSendPacket(session, packet, currentTimeout + TIMEOUT);
+					this.internalSendPacket(session, packet, currentTimeout + MessagingSettings.Timeout);
 				}
 			}
 			else
@@ -313,15 +363,15 @@ public class ReliableDeliveryNode extends Node {
 				Packet queuedPacket = outbound.getSendQueue().remove();
 				info("Dropping stale queued packet: " + queuedPacket.stringizeHeader());
 				
-				assert packet.getType() == MESSAGE_TYPE.DATA;
-				onMessageTimeout(packet.getTo());
+				assert queuedPacket.getType() == MESSAGE_TYPE.DATA;
+				onPacketTimeout(queuedPacket);
 			}
 
 			info("Dropping stale outbound packet: " + packet.stringizeHeader());
 			if (packet.getType() == MESSAGE_TYPE.DATA)
 			{
 				// Only notify upper layer of cancelled DATA packets
-				onMessageTimeout(packet.getTo());
+				onPacketTimeout(packet);
 			}
 		}
 	}
@@ -330,7 +380,8 @@ public class ReliableDeliveryNode extends Node {
 	 * Method that subclasses will override to handle reliably message received stuff
 	 * @param msgPayload
 	 */
-	protected void onReliableMessageReceived(int from, byte[] msgPayload) {
+	protected void onReliableMessageReceived(int from, byte[] msgPayload) 
+	{
 		info("Received message from " + from + ": [" + Utility.byteArrayToString(msgPayload) + "]");
 	}
 	
@@ -436,7 +487,7 @@ public class ReliableDeliveryNode extends Node {
 					dataPacket = current.getSendQueue().remove();
 					info("Sending queued packet: " + dataPacket.stringize());
 					current.addToWaitingForAckList(dataPacket.getSequence());
-					this.internalSendPacket(current, dataPacket, TIMEOUT);
+					this.internalSendPacket(current, dataPacket, MessagingSettings.Timeout);
 				}
 			} else {
 				 // ACK for a data packet.

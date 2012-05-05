@@ -1,182 +1,254 @@
 package node.facebook;
-
-import java.io.IOException;
 import java.util.Hashtable;
-import java.util.List;
-import java.util.Random;
 import java.util.Vector;
-
-import node.rpc.RPCMethodCall;
-
-import edu.washington.cs.cse490h.lib.PersistentStorageReader;
-import edu.washington.cs.cse490h.lib.PersistentStorageWriter;
-import edu.washington.cs.cse490h.lib.Utility;
+import node.rpc.IFacebookServer;
+import node.rpc.IFacebookServerReply;
+import node.rpc.RPCException;
 
 
-public class FacebookFrontendSystem extends BaseFacebookSystem {
-	private Hashtable<String, User> m_users = new Hashtable<String, User>();
-	private Hashtable<String, String> m_activeSessions = new Hashtable<String, String>();
-	private Hashtable<String, List<String>> m_friends = new Hashtable<String, List<String>>();
-	private Hashtable<String, List<String>> m_friendRequests = new Hashtable<String, List<String>>();
+public class FacebookFrontendSystem extends BaseFacebookSystem implements IFacebookServerReply
+{
+	private Hashtable<Integer, IFacebookServer> m_stubs = new Hashtable<Integer, IFacebookServer>();
 
-	public FacebookFrontendSystem(FacebookRPCNode node) {
+	/**
+	 * FacebookFrontendSystem()
+	 * @param node
+	 */
+	public FacebookFrontendSystem(FacebookRPCNode node) 
+	{
 		super(node);
 	}
-	
-	public String createUser(String username, String password) throws FacebookException {
-		if (this.isValidUser(username)) {
-			throw new FacebookException(FacebookException.USER_ALREADY_EXISTS);
-		} else {
-			this.appendToLog("create_user " + username + " " + password);
-			this.m_users.put(username, new User(username, password));
+
+	/**
+	 * onCommand()
+	 * Invoked when this node receives a command string from the console
+	 * 
+	 * @param command
+	 */
+	public void onCommand(String command)
+	{
+		IFacebookServer stub;
+		Integer serverAddr;
+
+		String[] parts = command.split("\\s+");
+
+		// Attempt to parse a server id from the first token.
+		// This can be used either for debugging purposes, or we
+		// could always auto-redirect to the right shard regardless
+		// of the node receiving the command.
+		// Currently we only auto-redirect if no specific shard was
+		// provided in the command line.
+		
+		try
+		{
+			serverAddr = Integer.parseInt(parts[0]);
 			
-			// Create ancillary data structures now.
-			// Makes the code cleaner than lazy creation.
-			this.m_friends.put(username, new Vector<String>());
-			this.m_friendRequests.put(username, new Vector<String>());
+			// Clone the array but skip the first element 
+			String[] parts2 = new String[parts.length-1];
+			for (int i=1; i<parts.length; i++)
+				parts2[i-1] = parts[i];
+			
+			parts = parts2;
+		}
+		catch (NumberFormatException ex)
+		{
+			// If no specific server was provided, auto-redirect 
+			serverAddr = -1;
 		}
 		
-		return null;
-	}
+		// Handle auto-redirection to the appropriate server,
+		// unless a specific recipient was explicitly provided
+		// (see above).
+		
+		int[] shards;
+		if (serverAddr == -1)
+		{
+			shards = m_node.getAppropriateShards(parts[0], parts[1]);
+		}
+		else
+		{
+			shards = new int[] { serverAddr };
+		}
+		
+		
+		// Execute the command on every shard.
+		// Most commands will run on only one shard, but write_message_all
+		// will be sent to all of them.
+		// TODO: write_message_all should only contact shards that actually
+		// contain friends of the user.
+		
+		for (int shard : shards)
+		{
+			// Get the proper stub for communication with the server
+			if (!m_stubs.containsKey(shard))
+			{
+				// NOTE: we create a different stub per server connection,
+				// but in the end all replies are handled by the same
+				// object ("this" one).
+				stub = m_node.connectToFacebookServer(shard, this);
+				m_stubs.put(shard, stub);
+			}
+			else
+			{
+				stub = m_stubs.get(shard);
+			}
+			
+			// Invoke the command on the server
+			try
+			{
+				switch (parts[0].toLowerCase())
+				{
+				case "login":
+					stub.login(parts[1], parts[2]);
+					break;
+					
+				case "logout":
+					stub.logout(parts[1]);
+					break;
+					
+				case "create_user":
+					stub.createUser(parts[1], parts[2]);
+					break;
+					
+				case "add_friend":
+					stub.addFriend(parts[1], parts[2]);
+					break;
+					
+				case "accept_friend":
+					stub.acceptFriend(parts[1], parts[2]);
+					break;
+					
+				case "write_message_one":
+					// TODO: implement
+					stub.writeMessageOne(parts[1], parts[2], parts[3]);
+					break;
+					
+				case "write_message_all":
+					String message = "";
+					
+					// The write_message_all command is special because it can contain spaces
+					// TODO: not very clean approach. Think about how making this in the subclasses
+					int idx = command.indexOf(' ');
+					int nextIdx = command.indexOf(' ', idx+1);
+					if (idx != -1 && nextIdx != -1) 
+						message = command.substring(nextIdx, command.length()).trim();
 	
-	public String login(String username, String password) throws FacebookException {
-		if (this.isValidUser(username)) {
-			String token = createNewSessionId();
-			this.m_activeSessions.put(token, username);
-			this.info("User: " + username + " logged in, token: " + token);
-			return token;
-		} else {
-			throw new FacebookException(FacebookException.USER_DONT_EXIST);
-		}
-	}
-	
-	public String logout(String token) throws FacebookException {
-		if (this.m_activeSessions.containsKey(token)) {
-			this.m_activeSessions.remove(token);
-			this.info("Token: " + token + " logged out");
-		} else {
-			throw new FacebookException(FacebookException.SESSION_DONT_EXIST);
-		}
-		
-		return null;
-	}
-	
-	public String addFriend(String token, String friendLogin) throws FacebookException {
-		String login = this.getUser(token).getLogin();
-		
-		if (!this.isValidUser(friendLogin)) {
-			throw new FacebookException(FacebookException.USER_DONT_EXIST);
-		}
-		
-		// Only add to log valid friend requests 
-		this.appendToLog("add_friend " + login + " " + friendLogin);
-
-		// Get the *friend's* request list
-		List<String> listFriends;
-		listFriends = this.m_friendRequests.get(friendLogin);
-		
-		// Add the user to the friend's request list
-		listFriends.add(login);
-		this.info("User: " + login + " requested to be friends of user " + friendLogin);
-		
-		return null;
-	}
-	
-
-	public String acceptFriend(String token, String friendLogin) throws FacebookException {
-		String login = this.getUser(token).getLogin();
-		
-		if (!this.isValidUser(friendLogin)) {
-			throw new FacebookException(FacebookException.USER_DONT_EXIST);
-		}
-		
-		List<String> requestList;
-		requestList = this.m_friendRequests.get(login);
-		
-		User friendUser;
-		friendUser = this.m_users.get(friendLogin);
-		
-		if (!requestList.contains(friendLogin)) {
-			// Can't accept friendship of somebody who hasn't requested it
-			throw new FacebookException(FacebookException.INVALID_REQUEST);
-		}
-		
-		this.appendToLog("accept_friend " + login + " " + friendLogin);
-		
-		requestList.remove(friendUser);
-		addFriendToList(login, friendLogin);
-		addFriendToList(friendLogin, login);
-		this.info("User: " + login + " accepted to be friends of user " + friendLogin);
-		
-		return null;
-	}
-	
-	private void addFriendToList(String login, String friendLogin) throws FacebookException {
-		List<String> listFriends;
-		listFriends = this.m_friends.get(login);
-		
-		if (!listFriends.contains(friendLogin)) {
-			listFriends.add(friendLogin);
-		} else {
-			this.info("Friend " + friendLogin + " already in " + login + "'s friend list");
-		}
-	}
-
-	private String createNewSessionId()
-	{
-		StringBuffer sb = new StringBuffer();
-		for (int i = 0 ; i < 10 ; i++) {
-			sb.append(Character.toChars('0' + Utility.getRNG().nextInt(10)));
-		}
-		return sb.toString();
-	}
-
-	private boolean isLoggedIn(String token)
-	{
-		return this.m_activeSessions.containsKey(token);
-	}
-
-	private boolean isValidUser(String username)
-	{
-		return this.m_users.containsKey(username);
-	}
-	
-	public User getUser(String token) throws FacebookException {
-		// In recovery the parameter actually will be the login
-		if (this.m_inRecovery) {
-			return this.m_users.get(token); 
-		}
-		
-		if (this.isLoggedIn(token)) {
-			String login = this.m_activeSessions.get(token);
-			return this.m_users.get(login);
-		} else {
-			throw new FacebookException(FacebookException.SESSION_DONT_EXIST);
-		}
-	}
-
-	protected String callLocalMethod(String methodCall, Vector<String> params) throws FacebookException {		
-		if (methodCall.startsWith("create_user")) {
-			return this.createUser(params.get(0), params.get(1));
-		} else if (methodCall.startsWith("login")) {
-			return this.login(params.get(0), params.get(1));
-		} else if (methodCall.startsWith("logout")) {
-			return this.logout(params.get(0));
-		} else if (methodCall.startsWith("add_friend")) {
-			return this.addFriend(params.get(0), params.get(1));
-		} else if (methodCall.startsWith("accept_friend")) {
-			return this.acceptFriend(params.get(0), params.get(1));
-		} else {
-			return null;
+					stub.writeMessageAll(parts[1], message);
+					break;
+					
+				case "read_message_all":
+					stub.readMessageAll(parts[1]);
+					break;
+					
+				default:
+					user_info(String.format("Unknown command: " + parts[0]));
+					break;
+				}
+			}
+			catch (RPCException ex)
+			{
+				// Never happens
+			}
+			catch (IndexOutOfBoundsException ex2)
+			{
+				user_info("Invalid syntax for command: " + parts[0]);
+			}
 		}
 	}
 	
 	@Override
-	protected boolean canCallLocalMethod(String methodCall, Vector<String> params) {
-		return methodCall.equals("create_user") || 
-				methodCall.equals("login") || 
-				methodCall.equals("logout") ||
-				methodCall.equals("add_friend") || 
-				methodCall.equals("accept_friend");
+	public void reply_login(int replyId, int sender, int result, String reply)
+	{
+		Vector<String> v = new Vector<String>();
+		v.add(((Integer) result).toString());
+		v.add(reply);
+		endClientCommand(sender, "login", v);
 	}
+
+	@Override
+	public void reply_logout(int replyId, int sender, int result, String reply)
+	{
+		Vector<String> v = new Vector<String>();
+		v.add(((Integer) result).toString());
+		v.add(reply);
+		endClientCommand(sender, "logout", v);
+	}
+
+	@Override
+	public void reply_createUser(int replyId, int sender, int result, String reply)
+	{
+		Vector<String> v = new Vector<String>();
+		v.add(((Integer) result).toString());
+		v.add(reply);
+		endClientCommand(sender, "createUser", v);
+	}
+
+	@Override
+	public void reply_addFriend(int replyId, int sender, int result, String reply)
+	{
+		Vector<String> v = new Vector<String>();
+		v.add(((Integer) result).toString());
+		v.add(reply);
+		endClientCommand(sender, "addFriend", v);
+	}
+
+	@Override
+	public void reply_acceptFriend(int replyId, int sender, int result, String reply)
+	{
+		Vector<String> v = new Vector<String>();
+		v.add(((Integer) result).toString());
+		v.add(reply);
+		endClientCommand(sender, "acceptFriend", v);
+	}
+
+	@Override
+	public void reply_writeMessageOne(int replyId, int sender, int result, String reply)
+	{
+		Vector<String> v = new Vector<String>();
+		v.add(((Integer) result).toString());
+		v.add(reply);
+		endClientCommand(sender, "writeMessageOne", v);
+	}
+
+	@Override
+	public void reply_writeMessageAll(int replyId, int sender, int result, String reply)
+	{
+		Vector<String> v = new Vector<String>();
+		v.add(((Integer) result).toString());
+		v.add(reply);
+		endClientCommand(sender, "writeMessageAll", v);
+	}
+
+	@Override
+	public void reply_readMessageAll(int replyId, int sender, int result, String reply)
+	{
+		Vector<String> v = new Vector<String>();
+		v.add(((Integer) result).toString());
+		v.add(reply);
+		endClientCommand(sender, "readMessageAll", v);
+	}
+
+	private void endClientCommand(int from, String methodName, Vector<String> params)
+	{
+		int result = Integer.parseInt(params.get(0));
+		
+		if (result != 0)
+		{
+			String errorMsg = String.format(FacebookRPCNode.ERROR_MESSAGE_FORMAT, methodName, from, result);
+			user_info(String.format("NODE %d: %s", m_node.addr, errorMsg));
+			user_info("Commands queued will be removed from list.");
+
+			// TODO: allowing concurrent commands for now 
+			//this._commandQueue.clear();
+		} 
+		else
+		{
+			String returnValue = params.size() == 2 ? params.get(1) : null;
+			user_info("Server returned ok. returnValue=" + returnValue);
+
+			// TODO: allowing concurrent commands for now 
+			//popCommandAndExecuteNext();
+		}
+	}
+	
 }

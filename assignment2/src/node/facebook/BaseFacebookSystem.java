@@ -2,17 +2,16 @@ package node.facebook;
 
 import java.io.IOException;
 import java.util.Vector;
-
 import node.rpc.RPCMethodCall;
-
 import edu.washington.cs.cse490h.lib.PersistentStorageReader;
+import edu.washington.cs.cse490h.lib.PersistentStorageWriter;
 import edu.washington.cs.cse490h.lib.Utility;
 
 public abstract class BaseFacebookSystem {
 	private static final String FILE_NAME = "facebookdb.txt";
 
 	protected boolean m_inRecovery = false;
-	private FacebookRPCNode m_node;
+	protected FacebookRPCNode m_node;
 	
 	public BaseFacebookSystem(FacebookRPCNode node) {
 		this.m_node = node;
@@ -25,9 +24,10 @@ public abstract class BaseFacebookSystem {
 				PersistentStorageReader psr = this.m_node.getReader(FILE_NAME);
 				String line;
 				while ((line = psr.readLine()) != null) {
-					info("Recovery: replaying command from log: " + line);
+					user_info("Recovery: replaying command from log: " + line);
 					RPCMethodCall methodCall = parseRPCMethodCall(line);
-					callLocalMethod(methodCall.getMethodName(), methodCall.getParams());
+					// TODO: fix recovery
+					//callLocalMethod(methodCall.getMethodName(), methodCall.getParams());
 				}
 				psr.close();				
 			}
@@ -42,15 +42,18 @@ public abstract class BaseFacebookSystem {
 		// Don't append to the log if in recovery mode
 		if (!m_inRecovery) {
 			try {
-				this.m_node.appendFileContents(FILE_NAME, content + "\n");
+				// TODO: use IStorageServer instead?
+				PersistentStorageWriter psw = m_node.getWriter(FILE_NAME, true);
+				psw.write(content);
+				psw.close();
 			} catch (IOException e) {
 				// TODO: return the proper error
 				e.printStackTrace();
 			}
 		}
 	}
-	
-	protected void info(String s) {
+
+	protected void user_info(String s) {
 		// Use a different prefix to be easy to distinguish
 		System.out.println(">>>> " + s);
 	}
@@ -86,7 +89,5 @@ public abstract class BaseFacebookSystem {
 		
 		return methodCall;
 	}
-	
-	protected abstract boolean canCallLocalMethod(String methodCall, Vector<String> params);
-	protected abstract String callLocalMethod(String methodCall, Vector<String> params) throws FacebookException;
+
 }
