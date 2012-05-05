@@ -266,6 +266,8 @@ public class TwoPhaseCommitNode extends RPCNode {
 	//TODO-licavalc: Need to do the right thing with write/read from log. Right now, we append an updated version of the whole json version of the object in the log.
 	//TODO-licavalc: How to store the state of the participant? Just store the participant JSON, use the TwoPhaseCommitContext for participants as well?	
 	private void saveContext(TwoPhaseCommitContext context) {
+		//TODO: updateFileContents() doesnt exist as part of RPCNode anymore. Commenting out for now.
+		/*
 		try {			
 			String logMessage =	String.format("start-2pc %s", context.toJson());
 			
@@ -273,6 +275,7 @@ public class TwoPhaseCommitNode extends RPCNode {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+		*/
 	}
 }
 
