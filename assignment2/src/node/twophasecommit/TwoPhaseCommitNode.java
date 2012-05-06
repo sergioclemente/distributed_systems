@@ -35,7 +35,7 @@ public class TwoPhaseCommitNode extends RPCNode {
 		{
 			receiveVoteRequest(from, params);
 		}
-		else if (methodName.equals("receive-vote"))
+		else if (methodName.equals("send-vote"))
 		{
 			receiveVote(from, params);
 		}
@@ -66,19 +66,12 @@ public class TwoPhaseCommitNode extends RPCNode {
 		TwoPhaseCommitContext newContext = new TwoPhaseCommitContext(addr ,participants, command, params);
 		_twoPhaseCommitContexts.put(newContext.getId(), newContext);
 		
-		Enumeration<TwoPhaseCommitContext> twoPhaseCommitContexts = _twoPhaseCommitContexts.elements();
-		while(twoPhaseCommitContexts.hasMoreElements())
+		if (anyTwoPhaseCommitPending(newContext))
 		{
-			TwoPhaseCommitContext twoPhaseCommitContext = twoPhaseCommitContexts.nextElement();
-			
-			// That means there is a pending two phase commit in progress - abort this one in this case
-			if (twoPhaseCommitContext != newContext && twoPhaseCommitContext.getDecision() == Decision.NotDecided)
-			{
-				//TODO-licavalc: is just the fact that the coordinator decided enough? Do we have to wait for it to notify participants? I don't think so, right?
-				abortTwoPhaseCommit(newContext.getId());
-				return;
-			}
-		}							
+			//TODO-licavalc: is just the fact that the coordinator decided enough? Do we have to wait for it to notify participants? I don't think so, right?
+			abortTwoPhaseCommit(newContext.getId());
+			return;
+		}
 		
 		//TODO-licavalc: Need a timeout for this.
 		for (String participant : participants) {
@@ -86,7 +79,7 @@ public class TwoPhaseCommitNode extends RPCNode {
 		}
 				
 		saveContext(newContext);
-	}		
+	}
 	
 	public void abortTwoPhaseCommit(UUID twoPhaseCommitContextId)
 	{
@@ -117,7 +110,27 @@ public class TwoPhaseCommitNode extends RPCNode {
 	
 	public void receiveAbort(int from, Vector<String> params)
 	{
-		// TODO Auto-generated method stub
+		if (params.size() < 1)
+		{
+			error("receiveAbort: wrong number of params.");
+			return;
+		}
+		
+		UUID twoPhaseCommitContextId = UUID.fromString(params.get(0));
+		
+		TwoPhaseCommitContext context = _twoPhaseCommitContexts.get(twoPhaseCommitContextId);
+		
+		if (context == null) 
+		{
+			error("receiveAbort: context not found.");
+			return;
+		}
+		
+		context.setDecision(Decision.Abort);
+		saveContext(context);
+		
+		// No need to do anything else, as we didn't really write anything in the write ahead log. We may need to 
+		// change this in the future.
 	}
 
 	private void commitTwoPhaseCommit(UUID twoPhaseCommitContextId) {
@@ -148,7 +161,28 @@ public class TwoPhaseCommitNode extends RPCNode {
 	
 	public void receiveCommit(int from, Vector<String> params)
 	{
-		// TODO Auto-generated method stub
+		if (params.size() < 1)
+		{
+			error("receiveCommit: wrong number of params.");
+			return;
+		}
+		
+		UUID twoPhaseCommitContextId = UUID.fromString(params.get(0));
+		
+		TwoPhaseCommitContext context = _twoPhaseCommitContexts.get(twoPhaseCommitContextId);
+		
+		if (context == null) 
+		{
+			error("receiveCommit: context not found.");
+			return;
+		}
+		
+		context.setDecision(Decision.Commit);
+		saveContext(context);
+		
+		//TODO-luciano: Luciano, you need to call this using your new call mechanism I guess.
+		//TODO-licavalc: we need to call this too when recovering
+		onMethodCalled(from, context.getCommand(), context.getParams());
 	}
 
 	public void beginVoteRequest(int targetSender, UUID twoPhaseCommitId, Vector<String> participants, String command, 
@@ -177,11 +211,39 @@ public class TwoPhaseCommitNode extends RPCNode {
 	 */
 	public void receiveVoteRequest(int from, Vector<String> params)
 	{
-		// TODO Auto-generated method stub
+		UUID twoPhaseCommitContextId = UUID.fromString(params.get(0));
 		
-		//TODO-licavalc: send the participant vote to the coordinator
-		//TODO-licavalc: If the participant Votes YES, start a timer to receive the decision, and initiates termination algorithm on timeout.
+		int participantsSize = Integer.valueOf(params.get(1));
+		Vector<String> participants = new Vector<String>(params.subList(2, participantsSize + 2));		
+		
+		String command = params.get(participantsSize + 2);
+		Vector<String> commandParams = new Vector<String>();
+		if (params.size() > participantsSize + 3)
+		{
+			commandParams.addAll(params.subList(participantsSize + 2, params.size()));
+		}
+		
+		TwoPhaseCommitContext newContext = 
+				new TwoPhaseCommitContext(twoPhaseCommitContextId, from ,participants, command, commandParams);
+		_twoPhaseCommitContexts.put(newContext.getId(), newContext);
+		
+		if (anyTwoPhaseCommitPending(newContext))
+		{
+			newContext.setDecision(Decision.Abort);
+			saveContext(newContext);
+			
+			beginSendVote(from, twoPhaseCommitContextId, Vote.No);
+			return;
+		}
+		
 		//TODO-licavalc: DON'T REALLY NEED THIS NOW: run the command at this point, but don't commit it. Needed to properly figure out the Vote.
+		
+		newContext.getParticipant(addr).setVote(Vote.Yes);
+		saveContext(newContext);
+		
+		beginSendVote(from, twoPhaseCommitContextId, Vote.Yes);
+		
+		//TODO-licavalc: If the participant Votes YES, start a timer to receive the decision, and initiates termination algorithm on timeout.		
 	}
 	
 	/**
@@ -198,7 +260,7 @@ public class TwoPhaseCommitNode extends RPCNode {
 		params.add(twoPhaseCommitId.toString());
 		params.add(vote.toString());
 		
-		callMethod(targetSender, "receive-vote", params);
+		callMethod(targetSender, "send-vote", params);
 	}
 	
 	/**
@@ -262,11 +324,27 @@ public class TwoPhaseCommitNode extends RPCNode {
 				info("receiveVote: haven't decided yet.");
 		}		
 	}	
+
+	private boolean anyTwoPhaseCommitPending(TwoPhaseCommitContext newContext) {
+		Enumeration<TwoPhaseCommitContext> twoPhaseCommitContexts = _twoPhaseCommitContexts.elements();
+		while(twoPhaseCommitContexts.hasMoreElements())
+		{
+			TwoPhaseCommitContext twoPhaseCommitContext = twoPhaseCommitContexts.nextElement();
+			
+			// That means there is a pending two phase commit in progress - abort this one in this case
+			if (twoPhaseCommitContext != newContext && twoPhaseCommitContext.getDecision() == Decision.NotDecided)
+			{				
+				return true;
+			}
+		}
+		
+		return false;
+	}
 	
 	//TODO-licavalc: Need to do the right thing with write/read from log. Right now, we append an updated version of the whole json version of the object in the log.
 	//TODO-licavalc: How to store the state of the participant? Just store the participant JSON, use the TwoPhaseCommitContext for participants as well?	
 	private void saveContext(TwoPhaseCommitContext context) {
-		//TODO: updateFileContents() doesnt exist as part of RPCNode anymore. Commenting out for now.
+		//TODO-luciano: updateFileContents() doesn't exist as part of RPCNode anymore. Commenting out for now.
 		/*
 		try {			
 			String logMessage =	String.format("start-2pc %s", context.toJson());
