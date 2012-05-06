@@ -19,9 +19,9 @@ public class TwoPhaseCommitContext
 	
 	private Decision _decision;
 	
-	public TwoPhaseCommitContext(int coordinator, Vector<String> participants, String command, Vector<String> params)
+	public TwoPhaseCommitContext(UUID id, int coordinator, Vector<String> participants, String command, Vector<String> params)
 	{
-		_id = UUID.randomUUID();
+		_id = id;
 		_command = command;
 		_params = params;
 		_coordinator = coordinator;
@@ -30,14 +30,19 @@ public class TwoPhaseCommitContext
 		_participants = new Vector<Participant>(participants.size());		
 		for (String participant : participants) {
 			_participants.add(new Participant(participant));
-		}		
+		}	
+	}
+	
+	public TwoPhaseCommitContext(int coordinator, Vector<String> participants, String command, Vector<String> params)
+	{
+		this(UUID.randomUUID(), coordinator, participants, command, params);
 	}
 	
 	public UUID getId() {
 		return _id;
 	}
 	
-	public int getCoordinator() {
+	public int getCoordinatorId() {
 		return _coordinator;
 	}
 	
@@ -106,21 +111,15 @@ public class TwoPhaseCommitContext
 		return decision;
 	}
 	
-	public String toJson()
+	public String serialize()
 	{
 		Gson gson = new Gson();
 		return gson.toJson(this);
 	}
+
+	public int getTimeout() {
+		// TODO-licavalc: calculate the right timeout based on the number of participants, unless we implement multicast or non-blocing rpc calls
+		return 0;
+	}
 }
 
-enum Vote {
-	Yes,
-	No,
-	None
-}
-
-enum Decision {
-	Commit,
-	Abort,
-	NotDecided
-}

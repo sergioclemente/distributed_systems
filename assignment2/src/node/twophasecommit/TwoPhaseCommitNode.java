@@ -1,26 +1,29 @@
 package node.twophasecommit;
 
-import java.io.IOException;
+import java.lang.reflect.Method;
 import java.util.Dictionary;
 import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.UUID;
 import java.util.Vector;
 
-import node.rpc.RPCNode;
-import node.rpc.RPCException;
+import edu.washington.cs.cse490h.lib.Callback;
+
 import node.rpc.I2pcCoordinator;
 import node.rpc.I2pcCoordinatorReply;
 import node.rpc.I2pcParticipant;
 import node.rpc.I2pcParticipantReply;
+import node.rpc.RPCException;
+import node.rpc.RPCNode;
 
 
 // TODO: this is not a node anymore, rename to something else. ThoPhaseCommitCoordinator?
-public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2pcCoordinatorReply, I2pcParticipantReply {
-	//TODO-licavalc: Deal with participants that are already in a 2pc process. They should just vote No and abort.	
-	
+public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2pcCoordinatorReply, I2pcParticipantReply 
+{		
 	private RPCNode m_node;
 	private Hashtable<Integer, I2pcParticipant> m_stubs = new Hashtable<Integer, I2pcParticipant>();
+	private Method m_waitForVotesTimeoutMethod;
+	private Method m_waitForDecisionTimeoutMethod;
 	
 	/**
 	 * We need to keep the history of two phase commit for the case of a node waking up and asking us for data about
@@ -39,6 +42,13 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 		
 		//TODO-licavalc: load state from log file
 		_twoPhaseCommitContexts = new Hashtable<UUID, TwoPhaseCommitContext>();
+		
+		try {
+			this.m_waitForVotesTimeoutMethod = Callback.getMethod("onWaitForVotesTimeout", this, new String[] { "java.util.UUID" });
+			this.m_waitForDecisionTimeoutMethod = Callback.getMethod("onWaitForDecisionTimeout", this, new String[] { "java.util.UUID" });
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 	
 	protected void onMethodCalled(int from, String methodName, Vector<String> params) {
@@ -58,6 +68,10 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 		{
 			receiveCommit(from, params);
 		}
+		else if (methodName.equals("decision-req"))
+		{
+			receiveDecisionRequest(from, params);
+		}
 	}
 
 	
@@ -76,12 +90,15 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 		
 		if (anyTwoPhaseCommitPending(newContext))
 		{
-			//TODO-licavalc: is just the fact that the coordinator decided enough? Do we have to wait for it to notify participants? I don't think so, right?
+			// LICAVALC: is just the fact that the coordinator decided enough? Do we have to wait for it to notify
+			// participants? I don't think so, right?
 			abortTwoPhaseCommit(newContext.getId());
 			return;
 		}
+
+		Callback cb = new Callback(this.m_waitForVotesTimeoutMethod, this, new Object[] { newContext.getId() });
+		m_node.addTimeout(cb, newContext.getTimeout());
 		
-		//TODO-licavalc: Need a timeout for this.
 		for (String participant : participants) {
 			beginVoteRequest(Integer.parseInt(participant), newContext.getId(), participants, command, params);
 		}
@@ -120,7 +137,7 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 	{
 		if (params.size() < 1)
 		{
-			error("receiveAbort: wrong number of params.");
+			m_node.error("receiveAbort: wrong number of params.");
 			return;
 		}
 		
@@ -130,7 +147,7 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 		
 		if (context == null) 
 		{
-			error("receiveAbort: context not found.");
+			m_node.error("receiveAbort: context not found.");
 			return;
 		}
 		
@@ -171,7 +188,7 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 	{
 		if (params.size() < 1)
 		{
-			error("receiveCommit: wrong number of params.");
+			m_node.error("receiveCommit: wrong number of params.");
 			return;
 		}
 		
@@ -181,7 +198,7 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 		
 		if (context == null) 
 		{
-			error("receiveCommit: context not found.");
+			m_node.error("receiveCommit: context not found.");
 			return;
 		}
 		
@@ -237,6 +254,7 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 		
 		if (anyTwoPhaseCommitPending(newContext))
 		{
+			newContext.getParticipant(m_node.addr).setVote(Vote.No);
 			newContext.setDecision(Decision.Abort);
 			saveContext(newContext);
 			
@@ -246,14 +264,75 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 		
 		//TODO-licavalc: DON'T REALLY NEED THIS NOW: run the command at this point, but don't commit it. Needed to properly figure out the Vote.
 		
-		newContext.getParticipant(addr).setVote(Vote.Yes);
+		newContext.getParticipant(m_node.addr).setVote(Vote.Yes);
 		saveContext(newContext);
 		
-		beginSendVote(from, twoPhaseCommitContextId, Vote.Yes);
+		Callback cb = new Callback(this.m_waitForDecisionTimeoutMethod, this, new Object[] { newContext.getId() });
+		m_node.addTimeout(cb, newContext.getTimeout());
 		
-		//TODO-licavalc: If the participant Votes YES, start a timer to receive the decision, and initiates termination algorithm on timeout.		
+		beginSendVote(from, twoPhaseCommitContextId, Vote.Yes);					
 	}
 	
+	private void startTerminationProtocol(UUID twoPhaseCommitContextId)
+	{
+		TwoPhaseCommitContext context = _twoPhaseCommitContexts.get(twoPhaseCommitContextId);
+		
+		if (context == null)
+		{
+			m_node.error("startTerminationProtocol: context not found.");
+			return;
+		}
+		
+		Callback cb = new Callback(this.m_waitForDecisionTimeoutMethod, this, new Object[] { context.getId() });
+		m_node.addTimeout(cb, context.getTimeout());
+		
+		//TODO: this would be better if it were a MULTICAST, just like at startTwoPhaseCommit
+		for (Participant participant : context.getParticipants()) {
+			if (participant.getId() != m_node.addr)
+			{
+				beginDecisionRequest(participant.getId(), context.getId());
+			}
+		}
+	}
+	
+	private void beginDecisionRequest(int targetSender, UUID twoPhaseCommitId) 
+	{
+		Vector<String> params = new Vector<String>(2);
+		
+		params.add(twoPhaseCommitId.toString());
+		
+		callMethod(targetSender, "decision-req", params);
+	}
+	
+	//TODO-luciano: need to add this method to the I2pcParticipant interface and implementation.
+	private void receiveDecisionRequest(int from, Vector<String> params)
+	{
+		if (params.size() < 1)
+		{
+			m_node.error("receiveDecisionRequest: wrong number of params.");
+			return;
+		}
+		
+		UUID twoPhaseCommitContextId = UUID.fromString(params.get(0));
+		
+		TwoPhaseCommitContext context = _twoPhaseCommitContexts.get(twoPhaseCommitContextId);
+		
+		if (context == null) 
+		{
+			m_node.error("receiveDecisionRequest: context not found.");
+			return;
+		}
+		
+		if (context.getDecision() == Decision.Abort)
+		{
+			beginSendAbort(from, twoPhaseCommitContextId);
+		}
+		else if (context.getDecision() == Decision.Commit)
+		{
+			beginSendCommit(from, twoPhaseCommitContextId);
+		}
+	}
+
 	/**
 	 * Method on the participant that sends the vote to the coordinator.
 	 * 
@@ -333,6 +412,30 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 		}		
 	}	
 
+	public void onWaitForVotesTimeout(UUID twoPhaseCommitContextId)
+	{
+		abortTwoPhaseCommit(twoPhaseCommitContextId);
+	}
+	
+	public void onWaitForDecisionTimeout(UUID twoPhaseCommitContextId)
+	{
+		TwoPhaseCommitContext context = _twoPhaseCommitContexts.get(twoPhaseCommitContextId);
+		
+		if (context == null)
+		{
+			m_node.error("startTerminationProtocol: context not found.");
+			return;
+		}
+		
+		// timed out and we didn't get to a decision, start timer again
+		if (context.getDecision() == Decision.NotDecided)
+		{
+			startTerminationProtocol(twoPhaseCommitContextId);
+		}
+		
+		// if we already reached a decision, don't have to do anything else.
+	}
+	
 	private boolean anyTwoPhaseCommitPending(TwoPhaseCommitContext newContext) {
 		Enumeration<TwoPhaseCommitContext> twoPhaseCommitContexts = _twoPhaseCommitContexts.elements();
 		while(twoPhaseCommitContexts.hasMoreElements())
