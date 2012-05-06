@@ -97,61 +97,49 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 			// Invoke the command on the server
 			try
 			{
-				switch (parts[0].toLowerCase())
-				{
-				case "login":
-					stub.login(parts[1], parts[2]);
-					handled = true;
-					break;
-					
-				case "logout":
-					stub.logout(parts[1]);
-					handled = true;
-					break;
-					
-				case "create_user":
-					stub.createUser(parts[1], parts[2]);
-					handled = true;
-					break;
-					
-				case "add_friend":
-					stub.addFriend(parts[1], parts[2]);
-					handled = true;
-					break;
-					
-				case "accept_friend":
-					stub.acceptFriend(parts[1], parts[2]);
-					handled = true;
-					break;
-					
-				case "write_message_one":
-					// TODO: implement
-					stub.writeMessageOne(parts[1], parts[2], parts[3]);
-					handled = true;
-					break;
-					
-				case "write_message_all":
-					String message = "";
-					
-					// The write_message_all command is special because it can contain spaces
-					// TODO: not very clean approach. Think about how making this in the subclasses
-					int idx = command.indexOf(' ');
-					int nextIdx = command.indexOf(' ', idx+1);
-					if (idx != -1 && nextIdx != -1) 
-						message = command.substring(nextIdx, command.length()).trim();
-	
-					stub.writeMessageAll(parts[1], message);
-					handled = true;
-					break;
-					
-				case "read_message_all":
-					stub.readMessageAll(parts[1]);
-					handled = true;
-					break;
-					
-				default:
-					user_info(String.format("Unknown command: " + parts[0]));
-					break;
+				String op = parts[0].toLowerCase();
+				switch(op) {
+					case "logout":
+						stub.logout(parts[1]);
+						handled = true;
+						break;
+						
+					case "create_user":
+						stub.createUser(parts[1], parts[2]);
+						handled = true;
+						break;
+						
+					case "add_friend":
+						stub.addFriend(parts[1], parts[2]);
+						handled = true;
+						break;
+						
+					case "accept_friend":
+						stub.acceptFriend(parts[1], parts[2]);
+						handled = true;
+						break;
+						
+					case "write_message_all":
+						String message = "";
+						
+						// The write_message_all command is special because it can contain spaces
+						// TODO: not very clean approach. Think about how making this in the subclasses
+						int idx = command.indexOf(' ');
+						int nextIdx = command.indexOf(' ', idx+1);
+						if (idx != -1 && nextIdx != -1) 
+							message = command.substring(nextIdx, command.length()).trim();
+		
+						stub.writeMessageAll(parts[1], message);
+						handled = true;
+						break;
+						
+					case "read_message_all":
+						stub.readMessageAll(parts[1]);
+						handled = true;
+						break;
+						
+					default:
+						user_info(String.format("Unknown command: " + parts[0]));
 				}
 			}
 			catch (RPCException ex)
@@ -240,21 +228,6 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 		{
 			// RPC call failed
 			onMethodFailed(sender, "accept_friend", result);
-		}
-	}
-
-	@Override
-	public void reply_writeMessageOne(int replyId, int sender, int result, String reply)
-	{
-		if (result == 0)
-		{
-			// RPC call succeeded
-			user_info("write_message_one: Server returned ok. returnValue=" + reply);
-		}
-		else
-		{
-			// RPC call failed
-			onMethodFailed(sender, "write_message_one", result);
 		}
 	}
 

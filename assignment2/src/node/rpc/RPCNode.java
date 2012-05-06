@@ -74,19 +74,6 @@ public class RPCNode extends ReliableDeliveryNode
 	}
 	*/
 	
-	/**
-	 * Classes that override this class should use this method to send a message
-	 * @param targetSender
-	 * @param methodName
-	 * @param params
-	 */
-	public void callMethod(int targetSender, String methodName, Vector<String> params)
-	{
-		// Unused for now, only here to avoid build breaks from StorageSystemServer
-		// TODO: fix StorageServer RPC implementation
-		((RPCMethodCall) null).notify();
-	}
-	
 	public void callMethod(int targetSender, String methodName, Vector<String> params, Integer replyId, RPCStub caller) 
 	{
 		if (caller != null)

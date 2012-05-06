@@ -7,7 +7,6 @@ public interface IFacebookServer
 	String logout(String username) throws RPCException;
 	String addFriend(String username, String friendname) throws RPCException;
 	String acceptFriend(String username, String friendname) throws RPCException;
-	String writeMessageOne(String username, String friendname, String message) throws RPCException;
 	String writeMessageAll(String username, String message) throws RPCException;
 	String readMessageAll(String username) throws RPCException;
 }

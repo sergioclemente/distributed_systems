@@ -84,10 +84,6 @@ public class Stub_FacebookServer extends RPCStub implements IFacebookServer
 			m_callback.reply_acceptFriend(replyId, sender, result, content);
 			break;
 			
-		case "writeMessageOne":
-			m_callback.reply_writeMessageOne(replyId, sender, result, content);
-			break;
-			
 		case "writeMessageAll":
 			m_callback.reply_writeMessageAll(replyId, sender, result, content);
 			break;

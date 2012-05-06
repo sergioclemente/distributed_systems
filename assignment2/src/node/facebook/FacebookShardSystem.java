@@ -35,7 +35,7 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 			this.appendToLog("create_user " + username + " " + password);
 			this.m_users.put(username, new User(username, password));
 			
-			// Create ancillary data structures now.
+			// Create auxiliary data structures now.
 			// Makes the code cleaner than lazy creation.
 			this.m_friends.put(username, new Vector<String>());
 			this.m_friendRequests.put(username, new Vector<String>());
@@ -169,15 +169,6 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 		} else {
 			throw new FacebookException(FacebookException.SESSION_DONT_EXIST);
 		}
-	}
-	
-	/**
-	 * API: IFacebookServer.writeMessageOne
-	 */
-	
-	public String writeMessageOne(String from, String to, String message) throws FacebookException {
-		// TODO: implement
-		return null;
 	}
 	
 	/**

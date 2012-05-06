@@ -19,7 +19,7 @@ public class Packet
 	 * @param buffer - byte array containing the full packet contents
 	 * @return Packet object
 	 */
-	public static Packet CreateFromBuffer(byte[] buffer) 
+	public static Packet createFromBuffer(byte[] buffer) 
 	{
 		assert buffer.length >= HEADER_LENGTH;
 		
@@ -52,7 +52,7 @@ public class Packet
 	 * @param payload - packet contents
 	 * @return Packet object
 	 */
-	public static Packet Create(int from, int to, int ptype, int connId, int seqNum, byte[] payload)
+	public static Packet create(int from, int to, int ptype, int connId, int seqNum, byte[] payload)
 	{
 		Packet packet;
 		

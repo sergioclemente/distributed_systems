@@ -75,7 +75,7 @@ public class ReliableDeliveryNode extends Node {
 	{
 		assert protocol == PROTOCOLS.SCOP;
 		
-		Packet packet = Packet.CreateFromBuffer(buffer);
+		Packet packet = Packet.createFromBuffer(buffer);
 		assert packet.getFrom() == from;
 		assert packet.getTo() == this.addr;
 		
@@ -169,7 +169,7 @@ public class ReliableDeliveryNode extends Node {
 		{
 			info("Establishing connection to node " + targetNode);
 			assert session.getSequence() == 0;
-			packet = Packet.Create(this.addr, targetNode, MESSAGE_TYPE.CONNECT, session.getConnectionId(), session.getSequence(), null);
+			packet = Packet.create(this.addr, targetNode, MESSAGE_TYPE.CONNECT, session.getConnectionId(), session.getSequence(), null);
 			session.addToWaitingForAckList(session.getSequence());
 			internalSendPacket(session, packet, MessagingSettings.Timeout);
 			session.setConnecting();
@@ -177,7 +177,7 @@ public class ReliableDeliveryNode extends Node {
 		
 		// Create the data packet
 		session.incSequence();
-		packet = Packet.Create(this.addr, targetNode, MESSAGE_TYPE.DATA, session.getConnectionId(), session.getSequence(), msgPayload);
+		packet = Packet.create(this.addr, targetNode, MESSAGE_TYPE.DATA, session.getConnectionId(), session.getSequence(), msgPayload);
 		
 		if (!session.getConnected())
 		{
@@ -274,7 +274,7 @@ public class ReliableDeliveryNode extends Node {
 	private void internalSendAck(int targetNode, int connectionId, int sequence)
 	{
 		Packet ack;
-		ack = Packet.Create(this.addr, targetNode, MESSAGE_TYPE.ACK, connectionId, sequence, null);
+		ack = Packet.create(this.addr, targetNode, MESSAGE_TYPE.ACK, connectionId, sequence, null);
 
 		info("Sending ACK: " + ack.stringize());
 		this.send(ack.getTo(), PROTOCOLS.SCOP, ack.toByteArray());
@@ -289,7 +289,7 @@ public class ReliableDeliveryNode extends Node {
 	private void internalSendReset(int targetNode, int connectionId, int sequence)
 	{
 		Packet reset;
-		reset = Packet.Create(this.addr, targetNode, MESSAGE_TYPE.RESET, connectionId, sequence, null);
+		reset = Packet.create(this.addr, targetNode, MESSAGE_TYPE.RESET, connectionId, sequence, null);
 
 		info("Sending RESET: " + reset.stringize());
 		this.send(reset.getTo(), PROTOCOLS.SCOP, reset.toByteArray());
