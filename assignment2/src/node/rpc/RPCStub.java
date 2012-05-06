@@ -3,10 +3,15 @@ import java.lang.reflect.Method;
 import java.util.Vector;
 import java.util.Hashtable;
 import edu.washington.cs.cse490h.lib.Callback;
+import edu.washington.cs.cse490h.lib.Utility;
 
 public abstract class RPCStub  
 {
-	protected static Integer s_replyId = 0;
+	// Initialize s_replyID with a random base, so that there's little likelihood that pending replies 
+	// will clash across crashes (otherwise a reply to call made before crash may be received as the 
+	// reply of a subsequent call with the same reply ID)
+	protected static Integer s_replyId = (Utility.getRNG().nextInt() & 0xffff) << 16;
+	
 	protected RPCNode m_node;
 	protected int m_addr;
 	private Method m_timeoutMethod;
@@ -19,7 +24,7 @@ public abstract class RPCStub
 	{
 		m_node = node;
 		m_addr = remoteAddress;
-		
+
 		try {
 			m_timeoutMethod = Callback.getMethod("onInvokeTimeout", this, new String[] { "java.lang.Integer" });
 		} catch (Exception e) {

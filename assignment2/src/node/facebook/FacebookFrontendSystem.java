@@ -25,11 +25,12 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 	 * 
 	 * @param command
 	 */
-	public void onCommand(String command)
+	public boolean onCommand(String command)
 	{
 		IFacebookServer stub;
 		Integer serverAddr;
-
+		boolean handled = false;
+		
 		String[] parts = command.split("\\s+");
 
 		// Attempt to parse a server id from the first token.
@@ -100,27 +101,33 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 				{
 				case "login":
 					stub.login(parts[1], parts[2]);
+					handled = true;
 					break;
 					
 				case "logout":
 					stub.logout(parts[1]);
+					handled = true;
 					break;
 					
 				case "create_user":
 					stub.createUser(parts[1], parts[2]);
+					handled = true;
 					break;
 					
 				case "add_friend":
 					stub.addFriend(parts[1], parts[2]);
+					handled = true;
 					break;
 					
 				case "accept_friend":
 					stub.acceptFriend(parts[1], parts[2]);
+					handled = true;
 					break;
 					
 				case "write_message_one":
 					// TODO: implement
 					stub.writeMessageOne(parts[1], parts[2], parts[3]);
+					handled = true;
 					break;
 					
 				case "write_message_all":
@@ -134,10 +141,12 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 						message = command.substring(nextIdx, command.length()).trim();
 	
 					stub.writeMessageAll(parts[1], message);
+					handled = true;
 					break;
 					
 				case "read_message_all":
 					stub.readMessageAll(parts[1]);
+					handled = true;
 					break;
 					
 				default:
@@ -154,6 +163,9 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 				user_info("Invalid syntax for command: " + parts[0]);
 			}
 		}
+		
+		// If returning false here, the command will be passed along to another handler.
+		return handled;
 	}
 	
 	@Override
