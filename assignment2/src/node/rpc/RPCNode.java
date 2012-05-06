@@ -1,15 +1,10 @@
 package node.rpc;
-import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.util.Hashtable;
 import java.util.LinkedList;
 import java.util.Queue;
 import java.util.Vector;
-
 import node.facebook.FacebookException;
 import node.reliable.ReliableDeliveryNode;
-import edu.washington.cs.cse490h.lib.PersistentStorageReader;
-import edu.washington.cs.cse490h.lib.PersistentStorageWriter;
 import edu.washington.cs.cse490h.lib.Utility;
 
 
@@ -271,6 +266,16 @@ public class RPCNode extends ReliableDeliveryNode
 		return new Stub_StorageServer(this, address, callbacks);
 	}
 		
+	public I2pcCoordinator connectTo2pcCoordinator(int address, I2pcCoordinatorReply callbacks)
+	{
+		return new Stub_2pcCoordinator(this, address, callbacks);
+	}
+
+	public I2pcParticipant connectTo2pcParticipant(int address, I2pcParticipantReply callbacks)
+	{
+		return new Stub_2pcParticipant(this, address, callbacks);
+	}
+
 	
 	/**
 	 * bindFacebookServerImpl
@@ -288,5 +293,16 @@ public class RPCNode extends ReliableDeliveryNode
 		skeleton.BindMethods(this);
 	}
 	
+	public void bind2pcCoordinatorImpl(I2pcCoordinator impl)
+	{
+		Skel_2pcCoordinator skeleton = new Skel_2pcCoordinator(impl);
+		skeleton.BindMethods(this);
+	}
+	
+	public void bind2pcParticipantImpl(I2pcParticipant impl)
+	{
+		Skel_2pcParticipant skeleton = new Skel_2pcParticipant(impl);
+		skeleton.BindMethods(this);
+	}
 }
 

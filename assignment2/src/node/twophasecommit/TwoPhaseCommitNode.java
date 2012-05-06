@@ -8,9 +8,19 @@ import java.util.UUID;
 import java.util.Vector;
 
 import node.rpc.RPCNode;
+import node.rpc.RPCException;
+import node.rpc.I2pcCoordinator;
+import node.rpc.I2pcCoordinatorReply;
+import node.rpc.I2pcParticipant;
+import node.rpc.I2pcParticipantReply;
 
-public class TwoPhaseCommitNode extends RPCNode {
+
+// TODO: this is not a node anymore, rename to something else. ThoPhaseCommitCoordinator?
+public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2pcCoordinatorReply, I2pcParticipantReply {
 	//TODO-licavalc: Deal with participants that are already in a 2pc process. They should just vote No and abort.	
+	
+	private RPCNode m_node;
+	private Hashtable<Integer, I2pcParticipant> m_stubs = new Hashtable<Integer, I2pcParticipant>();
 	
 	/**
 	 * We need to keep the history of two phase commit for the case of a node waking up and asking us for data about
@@ -23,13 +33,14 @@ public class TwoPhaseCommitNode extends RPCNode {
 	 * 
 	 * Restores the node state from the log from a Two Phase Commit point of view.
 	 */
-	public TwoPhaseCommitNode()
+	public TwoPhaseCommitNode(RPCNode node)
 	{
+		m_node = node;
+		
 		//TODO-licavalc: load state from log file
 		_twoPhaseCommitContexts = new Hashtable<UUID, TwoPhaseCommitContext>();
 	}
 	
-	@Override
 	protected void onMethodCalled(int from, String methodName, Vector<String> params) {
 		if (methodName.equals("vote-request"))
 		{
@@ -47,11 +58,8 @@ public class TwoPhaseCommitNode extends RPCNode {
 		{
 			receiveCommit(from, params);
 		}
-		else
-		{
-			super.onMethodCalled(from, methodName, params);
-		}
 	}
+
 	
 	/**
 	 * Starts a new two phase commit process. It tries to execute the passed command on the passed list of 
@@ -63,7 +71,7 @@ public class TwoPhaseCommitNode extends RPCNode {
 	 */
 	public void startTwoPhaseCommit(Vector<String> participants, String command, Vector<String> params)
 	{
-		TwoPhaseCommitContext newContext = new TwoPhaseCommitContext(addr ,participants, command, params);
+		TwoPhaseCommitContext newContext = new TwoPhaseCommitContext(m_node.addr, participants, command, params);
 		_twoPhaseCommitContexts.put(newContext.getId(), newContext);
 		
 		if (anyTwoPhaseCommitPending(newContext))
@@ -87,7 +95,7 @@ public class TwoPhaseCommitNode extends RPCNode {
 		
 		if (context == null)
 		{
-			error("abortTwoPhaseCommit: context not found.");
+			m_node.error("abortTwoPhaseCommit: context not found.");
 			return;
 		}
 		
@@ -138,7 +146,7 @@ public class TwoPhaseCommitNode extends RPCNode {
 		
 		if (context == null)
 		{
-			error("commitTwoPhaseCommit: context not found.");
+			m_node.error("commitTwoPhaseCommit: context not found.");
 			return;
 		}		
 		
@@ -273,7 +281,7 @@ public class TwoPhaseCommitNode extends RPCNode {
 	{
 		if (params.size() < 2)
 		{
-			error("receiveVote: wrong number of params.");
+			m_node.error("receiveVote: wrong number of params.");
 			return;
 		}
 		
@@ -283,7 +291,7 @@ public class TwoPhaseCommitNode extends RPCNode {
 		
 		if (context == null) 
 		{
-			error("receiveVote: context not found.");
+			m_node.error("receiveVote: context not found.");
 			return;
 		}
 		
@@ -303,13 +311,13 @@ public class TwoPhaseCommitNode extends RPCNode {
 			}
 			else
 			{
-				error("receiveVote: Unknown vote type");
+				m_node.error("receiveVote: Unknown vote type");
 				return;
 			}
 		}
 		else
 		{
-			warn("receiveVote: already received vote for participant.");
+			m_node.warn("receiveVote: already received vote for participant.");
 		}
 		
 		switch(context.getDecisionBasedOnVotes())
@@ -321,7 +329,7 @@ public class TwoPhaseCommitNode extends RPCNode {
 				abortTwoPhaseCommit(twoPhaseCommitContextId);
 				break;
 			default:
-				info("receiveVote: haven't decided yet.");
+				m_node.info("receiveVote: haven't decided yet.");
 		}		
 	}	
 
@@ -354,6 +362,213 @@ public class TwoPhaseCommitNode extends RPCNode {
 			e.printStackTrace();
 		}
 		*/
+	}
+	
+	
+	// Temporary shim to fit current implementation model
+	public boolean onCommand(String command)
+	{
+		/*
+		String[] parts = command.split("\\s+");
+		
+		if (parts.length >= 3)
+		{
+			int from = Integer.parseInt(parts[0]);
+			String methodName = parts[1].toLowerCase();
+			
+			Vector<String> methodArgs = new Vector<String>();
+			for (int i = 2; i < parts.length; i++)
+					methodArgs.add(parts[i]);
+			
+			onMethodCalled(from, methodName, methodArgs);
+			return true;
+		}
+		*/
+		
+		return false;
+	}
+	
+	// Temporary shim to fit current implementation model
+	private void callMethod(int address, String methodName, Vector<String> params)
+	{
+		I2pcParticipant stub;
+		
+		if (m_stubs.containsKey(address))
+		{
+			stub = m_stubs.get(address);
+		}
+		else
+		{
+			stub = m_node.connectTo2pcParticipant(address, this);
+			m_stubs.put(address, stub);
+		}
+
+		String command = ((Integer) m_node.addr).toString(); 
+		command += " " + methodName;
+		for (String arg : params)
+			command += " " + arg;
+		
+		try 
+		{
+			stub.backcompat(command);
+		}
+		catch (RPCException e)
+		{
+			// Never happens
+		}
+ 	}
+	
+
+	/**
+	 * RPC: I2pcCoordinator.notifyPrepared()
+	 */
+	@Override 
+	public String notifyPrepared(String transactionId) throws RPCException
+	{
+		return null;
+	}
+
+	/**
+	 * RPC: I2pcCoordinator.notifyAborted()
+	 */
+	@Override 
+	public String notifyAborted(String transactionId) throws RPCException
+	{
+		return null;
+	}
+
+	/**
+	 * RPC: I2pcCoordinator.queryDecision()
+	 */
+	@Override 
+	public String queryDecision(String transactionId) throws RPCException
+	{
+		return null;
+	}
+	
+
+	/**
+	 * RPC: I2pcParticipant.startTransaction
+	 */
+	@Override 
+	public String startTransaction(String transactionId) throws RPCException		
+	{
+		return null;
+	}
+	
+	/**
+	 * RPC: I2pcParticipant.requestPrepare
+	 */
+	@Override 
+	public String requestPrepare(String transactionId) throws RPCException
+	{
+		return null;
+	}
+	
+	/**
+	 * RPC: I2pcParticipant.commitTransaction
+	 */
+	@Override 
+	public String commitTransaction(String transactionId) throws RPCException
+	{
+		return null;
+	}
+	
+	/**
+	 * RPC: I2pcParticipant.abortTransaction
+	 */
+	@Override 
+	public String abortTransaction(String transactionId) throws RPCException
+	{
+		return null;
+	}
+	
+	/**
+	 * RPC: I2pcParticipant.backcompat
+	 */
+	@Override 
+	public String backcompat(String blob) throws RPCException
+	{
+		String[] parts = blob.split("\\s+");
+		int from = Integer.parseInt(parts[0]);
+		String methodName = parts[1];
+		Vector<String> args = new Vector<String>();
+		for (int i = 2; i < parts.length; i++)
+			args.add(parts[i]);
+		
+		onMethodCalled(from, methodName, args);
+		return null;
+	}
+	
+
+	/**
+	 * RPC: I2pcCoordinatorReply.reply_notifyPrepared
+	 */
+	public void reply_notifyPrepared(int replyId, int sender, int result, String reply)
+	{
+		
+	}
+	
+	/**
+	 * RPC: I2pcCoordinatorReply.reply_notifyAborted
+	 */
+	public void reply_notifyAborted(int replyId, int sender, int result, String reply)
+	{
+		
+	}
+	
+	/**
+	 * RPC: I2pcCoordinatorReply.reply_queryDecision
+	 */
+	public void reply_queryDecision(int replyId, int sender, int result, String reply)
+	{
+		
+	}
+	
+	
+	/**
+	 * RPC: I2pcParticipantReply.reply_startTransaction
+	 */
+	@Override
+	public void reply_startTransaction(int replyId, int sender, int result, String reply)
+	{
+		return;
+	}
+
+	/**
+	 * RPC: I2pcParticipantReply.reply_requestPrepare
+	 */
+	@Override
+	public void reply_requestPrepare(int replyId, int sender, int result, String reply)
+	{
+		return;
+	}
+
+	/**
+	 * RPC: I2pcParticipantReply.reply_commitTransaction
+	 */
+	@Override
+	public void reply_commitTransaction(int replyId, int sender, int result, String reply)
+	{
+		return;
+	}
+
+	/**
+	 * RPC: I2pcParticipantReply.reply_abortTransaction
+	 */
+	@Override
+	public void reply_abortTransaction(int replyId, int sender, int result, String reply)
+	{
+		return;
+	}
+	
+	/**
+	 * RPC: I2pcParticipantReply.reply_backcompat
+	 */
+	@Override
+	public void reply_backcompat(int replyId, int sender, int result, String reply)
+	{
+		
 	}
 }
 

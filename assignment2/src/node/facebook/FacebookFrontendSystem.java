@@ -25,11 +25,12 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 	 * 
 	 * @param command
 	 */
-	public void onCommand(String command)
+	public boolean onCommand(String command)
 	{
 		IFacebookServer stub;
 		Integer serverAddr;
-
+		boolean handled = false;
+		
 		String[] parts = command.split("\\s+");
 
 		// Attempt to parse a server id from the first token.
@@ -100,27 +101,33 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 				{
 				case "login":
 					stub.login(parts[1], parts[2]);
+					handled = true;
 					break;
 					
 				case "logout":
 					stub.logout(parts[1]);
+					handled = true;
 					break;
 					
 				case "create_user":
 					stub.createUser(parts[1], parts[2]);
+					handled = true;
 					break;
 					
 				case "add_friend":
 					stub.addFriend(parts[1], parts[2]);
+					handled = true;
 					break;
 					
 				case "accept_friend":
 					stub.acceptFriend(parts[1], parts[2]);
+					handled = true;
 					break;
 					
 				case "write_message_one":
 					// TODO: implement
 					stub.writeMessageOne(parts[1], parts[2], parts[3]);
+					handled = true;
 					break;
 					
 				case "write_message_all":
@@ -134,10 +141,12 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 						message = command.substring(nextIdx, command.length()).trim();
 	
 					stub.writeMessageAll(parts[1], message);
+					handled = true;
 					break;
 					
 				case "read_message_all":
 					stub.readMessageAll(parts[1]);
+					handled = true;
 					break;
 					
 				default:
@@ -154,101 +163,136 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 				user_info("Invalid syntax for command: " + parts[0]);
 			}
 		}
+		
+		// If returning false here, the command will be passed along to another handler.
+		return handled;
 	}
 	
 	@Override
 	public void reply_login(int replyId, int sender, int result, String reply)
 	{
-		Vector<String> v = new Vector<String>();
-		v.add(((Integer) result).toString());
-		v.add(reply);
-		endClientCommand(sender, "login", v);
+		if (result == 0)
+		{
+			// RPC call succeeded
+			user_info("User logged in. Token=" + reply);
+		}
+		else
+		{
+			// RPC call failed
+			onMethodFailed(sender, "login", result);
+		}
 	}
 
 	@Override
 	public void reply_logout(int replyId, int sender, int result, String reply)
 	{
-		Vector<String> v = new Vector<String>();
-		v.add(((Integer) result).toString());
-		v.add(reply);
-		endClientCommand(sender, "logout", v);
+		if (result == 0)
+		{
+			// RPC call succeeded
+			user_info("User logged out.");
+		}
+		else
+		{
+			// RPC call failed
+			onMethodFailed(sender, "logout", result);
+		}
 	}
 
 	@Override
 	public void reply_createUser(int replyId, int sender, int result, String reply)
 	{
-		Vector<String> v = new Vector<String>();
-		v.add(((Integer) result).toString());
-		v.add(reply);
-		endClientCommand(sender, "createUser", v);
+		if (result == 0)
+		{
+			// RPC call succeeded
+			user_info("create_user: Server returned ok. returnValue=" + reply);
+		}
+		else
+		{
+			// RPC call failed
+			onMethodFailed(sender, "create_user", result);
+		}
 	}
 
 	@Override
 	public void reply_addFriend(int replyId, int sender, int result, String reply)
 	{
-		Vector<String> v = new Vector<String>();
-		v.add(((Integer) result).toString());
-		v.add(reply);
-		endClientCommand(sender, "addFriend", v);
+		if (result == 0)
+		{
+			// RPC call succeeded
+			user_info("add_friend: Server returned ok. returnValue=" + reply);
+		}
+		else
+		{
+			// RPC call failed
+			onMethodFailed(sender, "add_friend", result);
+		}
 	}
 
 	@Override
 	public void reply_acceptFriend(int replyId, int sender, int result, String reply)
 	{
-		Vector<String> v = new Vector<String>();
-		v.add(((Integer) result).toString());
-		v.add(reply);
-		endClientCommand(sender, "acceptFriend", v);
+		if (result == 0)
+		{
+			// RPC call succeeded
+			user_info("accept_friend: Server returned ok. returnValue=" + reply);
+		}
+		else
+		{
+			// RPC call failed
+			onMethodFailed(sender, "accept_friend", result);
+		}
 	}
 
 	@Override
 	public void reply_writeMessageOne(int replyId, int sender, int result, String reply)
 	{
-		Vector<String> v = new Vector<String>();
-		v.add(((Integer) result).toString());
-		v.add(reply);
-		endClientCommand(sender, "writeMessageOne", v);
+		if (result == 0)
+		{
+			// RPC call succeeded
+			user_info("write_message_one: Server returned ok. returnValue=" + reply);
+		}
+		else
+		{
+			// RPC call failed
+			onMethodFailed(sender, "write_message_one", result);
+		}
 	}
 
 	@Override
 	public void reply_writeMessageAll(int replyId, int sender, int result, String reply)
 	{
-		Vector<String> v = new Vector<String>();
-		v.add(((Integer) result).toString());
-		v.add(reply);
-		endClientCommand(sender, "writeMessageAll", v);
+		if (result == 0)
+		{
+			// RPC call succeeded
+			user_info("write_message_all: Server returned ok. returnValue=" + reply);
+		}
+		else
+		{
+			// RPC call failed
+			onMethodFailed(sender, "write_message_all", result);
+		}
 	}
 
 	@Override
 	public void reply_readMessageAll(int replyId, int sender, int result, String reply)
 	{
-		Vector<String> v = new Vector<String>();
-		v.add(((Integer) result).toString());
-		v.add(reply);
-		endClientCommand(sender, "readMessageAll", v);
-	}
-
-	private void endClientCommand(int from, String methodName, Vector<String> params)
-	{
-		int result = Integer.parseInt(params.get(0));
-		
-		if (result != 0)
+		if (result == 0)
 		{
-			String errorMsg = String.format(FacebookRPCNode.ERROR_MESSAGE_FORMAT, methodName, from, result);
-			user_info(String.format("NODE %d: %s", m_node.addr, errorMsg));
-			user_info("Commands queued will be removed from list.");
-
-			// TODO: allowing concurrent commands for now 
-			//this._commandQueue.clear();
-		} 
+			// RPC call succeeded
+			user_info("read_message_all: Returned content:"); 
+			user_info(reply);
+		}
 		else
 		{
-			String returnValue = params.size() == 2 ? params.get(1) : null;
-			user_info("Server returned ok. returnValue=" + returnValue);
-
-			// TODO: allowing concurrent commands for now 
-			//popCommandAndExecuteNext();
+			// RPC call failed
+			onMethodFailed(sender, "read_message_all", result);
 		}
 	}
-	
+
+	private void onMethodFailed(int from, String methodName, int result)
+	{
+		String errorMsg = String.format(FacebookRPCNode.ERROR_MESSAGE_FORMAT, methodName, from, result);
+		user_info(String.format("NODE %d: %s", m_node.addr, errorMsg));
+	}
+		
 }

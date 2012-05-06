@@ -4,11 +4,14 @@ import java.util.Vector;
 
 import node.rpc.RPCMethodCall;
 import node.rpc.RPCNode;
+import node.rpc.I2pcParticipant;
+import node.twophasecommit.TwoPhaseCommitNode;
 
 
 public class FacebookRPCNode extends RPCNode {
 	private FacebookShardSystem m_system;
 	private FacebookFrontendSystem m_client;
+	private TwoPhaseCommitNode m_2pcCoord;
 	
 	private final static int[] SHARDS_ADDRESSES = new int[] {0,1,2,3,4,5};
 	
@@ -30,8 +33,13 @@ public class FacebookRPCNode extends RPCNode {
 		this.info("Starting sharding instance on address " + this.addr);
 		this.m_system = new FacebookShardSystem(this);
 
+		this.info("Starting 2PC coordinator support on address " + this.addr);
+		this.m_2pcCoord = new TwoPhaseCommitNode(this);
+		
 		// Enable this node to receive RPC calls for these interfaces
 		this.bindFacebookServerImpl(m_system);
+		this.bind2pcCoordinatorImpl(m_2pcCoord);
+		this.bind2pcParticipantImpl((I2pcParticipant) m_2pcCoord);
 		
 		// Replay the file in memory
 		this.m_system.recoverFromCrash();
@@ -40,7 +48,16 @@ public class FacebookRPCNode extends RPCNode {
 	@Override
 	public void onCommand(String command)
 	{
-		m_client.onCommand(command);
+		boolean handled;
+		
+		// Let the facebook frontend take the first crack
+		handled = m_client.onCommand(command);
+		
+		if (!handled)
+		{
+			// See if the 2PC coordinator can handle this command
+			handled = m_2pcCoord.onCommand(command);
+		}
 		
 		/*
 		// TODO: the queuing logic is not in place
@@ -80,6 +97,7 @@ public class FacebookRPCNode extends RPCNode {
 			} else {
 				// select a shard based on the user's login hash
 				//int shardAddress =  user.getLogin().hashCode() % SHARDS_ADDRESSES.length;
+				
 				int shardAddress;
 				shardAddress = token.toLowerCase().hashCode();
 				shardAddress = shardAddress % SHARDS_ADDRESSES.length;
@@ -155,4 +173,5 @@ public class FacebookRPCNode extends RPCNode {
 	protected void onConnectionAborted(int endpoint) {
 		this.m_system.user_info("connection aborted!");
 	}
+	
 }

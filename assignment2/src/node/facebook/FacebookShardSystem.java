@@ -4,10 +4,7 @@ import java.util.Hashtable;
 import java.util.List;
 import java.util.Set;
 import java.util.Vector;
-
 import edu.washington.cs.cse490h.lib.Utility;
-
-import node.rpc.RPCMethodCall;
 import node.rpc.IFacebookServer;
 
 public class FacebookShardSystem extends BaseFacebookSystem implements IFacebookServer {
