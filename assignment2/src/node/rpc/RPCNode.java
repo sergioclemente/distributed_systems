@@ -248,10 +248,6 @@ public class RPCNode extends ReliableDeliveryNode
 		return new Stub_FacebookServer(this, address, callbacks);
 	}
 
-	public IStorageServer connectToStorageServer(int address, IStorageServerReply callbacks)
-	{
-		return new Stub_StorageServer(this, address, callbacks);
-	}
 		
 	public I2pcCoordinator connectTo2pcCoordinator(int address, I2pcCoordinatorReply callbacks)
 	{
@@ -271,12 +267,6 @@ public class RPCNode extends ReliableDeliveryNode
 	public void bindFacebookServerImpl(IFacebookServer impl)
 	{
 		Skel_FacebookServer skeleton = new Skel_FacebookServer(impl);
-		skeleton.BindMethods(this);
-	}
-	
-	public void bindStorageServerImpl(IStorageServer impl)
-	{
-		Skel_StorageServer skeleton = new Skel_StorageServer(impl);
 		skeleton.BindMethods(this);
 	}
 	
