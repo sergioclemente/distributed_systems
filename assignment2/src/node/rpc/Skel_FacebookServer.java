@@ -37,17 +37,17 @@ public class Skel_FacebookServer extends RPCSkeleton
 			break;
 			
 		case "add_friend_receiver":
-			content = m_impl.addFriend_receiver(methodArgs.get(0), methodArgs.get(1));
+			content = m_impl.addFriendReceiver(methodArgs.get(0), methodArgs.get(1));
 			break;
 			
 		case "accept_friend_adder":
-			content = m_impl.acceptFriend_adder(methodArgs.get(0), methodArgs.get(1));
+			content = m_impl.acceptFriendAdder(methodArgs.get(0), methodArgs.get(1));
 			break;
 			
 		case "accept_friend_receiver":
-			content = m_impl.acceptFriend_receiver(methodArgs.get(0), methodArgs.get(1));
+			content = m_impl.acceptFriendReceiver(methodArgs.get(0), methodArgs.get(1));
 			break;			
-		case "write_wessage_all":
+		case "write_message_all":
 			content = m_impl.writeMessageAll(methodArgs.get(0), methodArgs.get(1));
 			break;
 			

@@ -38,6 +38,9 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 			// Makes the code cleaner than lazy creation.
 			this.m_friends.put(username, new Vector<String>());
 			this.m_pendingFriendRequests.put(username, new Vector<String>());
+			this.m_messages.put(username, new Vector<Message>());
+			
+			this.user_info("created user " + username + " " + password);
 		}
 		
 		return null;
@@ -71,7 +74,7 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 		return null;
 	}
 	
-	public String addFriend_receiver(String adderLogin, String receiverLogin) throws FacebookException {
+	public String addFriendReceiver(String adderLogin, String receiverLogin) throws FacebookException {
 		if (!this.isValidUser(receiverLogin)) {
 			throw new FacebookException(FacebookException.USER_DONT_EXIST);
 		}
@@ -93,7 +96,7 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 	/**
 	 * API: IFacebookServer.acceptFriend
 	 */
-	public String acceptFriend_receiver(String adderLogin, String receiverLogin) throws FacebookException {
+	public String acceptFriendReceiver(String adderLogin, String receiverLogin) throws FacebookException {
 		List<String> requestList;
 		requestList = this.m_pendingFriendRequests.get(receiverLogin);
 		
@@ -111,7 +114,7 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 		return null;
 	}
 	
-	public String acceptFriend_adder(String token, String adderLogin) throws FacebookException {
+	public String acceptFriendAdder(String token, String adderLogin) throws FacebookException {
 		String receiverLogin = extractUserLogin(token);
 				
 		this.appendToLog("accept_friend_adder " + receiverLogin + " " + adderLogin);
@@ -163,11 +166,18 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 	 */
 	public String writeMessageAll(String from, String message) throws FacebookException {
 		
-		Set<String> logins = m_messages.keySet();
+		Set<String> logins = m_users.keySet();
 		
 		Message m = new Message(from, message);
-		for (String login : logins) {
-			this.m_messages.get(login).add(m);
+		
+		for (String login: logins) {
+			// Just add the message if the users are friends
+			if (this.m_friends.get(login).contains(from)) {
+				Vector<Message> messages = this.m_messages.get(login);
+				if (messages != null) {
+					messages.add(m);
+				}
+			}
 		}
 
 		this.appendToLog("write_message_all " + from + " " + message);
@@ -185,13 +195,15 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 		Vector<Message> messages = this.m_messages.get(login);
 		StringBuffer sb = new StringBuffer();
 
-		for (Message message : messages) {
-			sb.append("From:");
-			sb.append(message.getFromLogin());
-		 	sb.append('\n');
-		 	sb.append("Content:");
-		 	sb.append(message.getMessage());
-		 	sb.append('\n');
+		if (messages != null) {
+			for (Message message : messages) {
+				sb.append("From:");
+				sb.append(message.getFromLogin());
+			 	sb.append('\n');
+			 	sb.append("Content:");
+			 	sb.append(message.getMessage());
+			 	sb.append('\n');
+			}
 		}
 
 		return sb.toString();

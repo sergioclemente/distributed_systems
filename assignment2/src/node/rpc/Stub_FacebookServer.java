@@ -28,26 +28,27 @@ public class Stub_FacebookServer extends RPCStub implements IFacebookServer
 		return null;
 	}
 	
-	public String addFriend_receiver(String username, String friendname)
+	public String addFriendReceiver(String username, String friendname)
 	{
 		super.invoke("add_friend_receiver", username, friendname);
 		return null;
 	}
 	
-	public String acceptFriend_receiver(String username, String friendname)
+	public String acceptFriendReceiver(String username, String friendname)
 	{
 		super.invoke("accept_friend_receiver", username, friendname);
 		return null;
 	}
 	
-	public String acceptFriend_adder(String username, String friendname)
+	public String acceptFriendAdder(String username, String friendname)
 	{
 		super.invoke("accept_friend_adder", username, friendname);
 		return null;
 	}
-		public String writeMessageAll(String username, String message)
+	
+	public String writeMessageAll(String from, String message)
 	{
-		super.invoke("write_message_all", username, message);
+		super.invoke("write_message_all", from, message);
 		return null;
 	}
 	

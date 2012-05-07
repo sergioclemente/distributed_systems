@@ -27,6 +27,7 @@ public abstract class RPCSkeleton
 		catch (Exception ex)
 		{
 			result.error = RPCNode.ERROR_UNHANDLED_EXCEPTION;
+			ex.printStackTrace();
 		}
 		
 		return result;

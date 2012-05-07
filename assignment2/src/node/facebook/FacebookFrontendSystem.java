@@ -52,56 +52,73 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 		
 		String login = extractLoginFromCommand(methodName, parts).toLowerCase();
 		
-		IFacebookServer stub = getShardFromAddress(getShardAddress(login));
-		
 		try
 		{
 			String op = parts[0].toLowerCase();
 			switch(op) {
 				case "login":
-					stub.login(parts[1], parts[2]);
+				{
+					IFacebookServer shard = getShardFromLogin(login);
+					String pwd = parts[2];
+					
+					shard.login(login, pwd);
 					break;
+				}
 				case "logout":
-					stub.logout(parts[1]);
+				{
+					IFacebookServer shard = getShardFromLogin(login);
+					String token = parts[1];
+					
+					shard.logout(token);
 					break;
+				}
 				case "create_user":
-					stub.createUser(parts[1], parts[2]);
+				{
+					IFacebookServer shard = getShardFromLogin(login);
+					String pwd = parts[2];
+					
+					shard.createUser(login, pwd);
 					break;
+				}
 				case "add_friend":
 				{
 					String adderLogin = login;
 					String receiverLogin = parts[2];
-					IFacebookServer stubReceiver = getShardFromAddress(getShardAddress(receiverLogin));
-					stubReceiver.addFriend_receiver(adderLogin, receiverLogin);
+					
+					IFacebookServer shardReceiver = getShardFromLogin(receiverLogin);
+					shardReceiver.addFriendReceiver(adderLogin, receiverLogin);
 					break;
 				}
 				case "accept_friend":
 				{
 					String receiverLogin = login;
 					String adderLogin = parts[2];
-					IFacebookServer stubAdder = getShardFromAddress(getShardAddress(adderLogin));
-					stub.acceptFriend_receiver(adderLogin, receiverLogin);
-					stubAdder.acceptFriend_receiver(adderLogin, receiverLogin);
+					IFacebookServer shardReceiver = getShardFromLogin(login);
+					IFacebookServer shardAdder = getShardFromLogin(adderLogin);
+					
+					// TODO: Add 2pc here
+					shardReceiver.acceptFriendReceiver(adderLogin, receiverLogin);
+					shardAdder.acceptFriendReceiver(adderLogin, receiverLogin);
 					break;
 				}
 				case "write_message_all":
 					// TODO: write_message_all should only contact shards that actually
 					// contain friends of the user.
-					String message = "";
-					
-					// The write_message_all command is special because it can contain spaces
-					// TODO: not very clean approach. Think about how making this in the subclasses
-					int idx = command.indexOf(' ');
-					int nextIdx = command.indexOf(' ', idx+1);
-					if (idx != -1 && nextIdx != -1) {
-						message = command.substring(nextIdx, command.length()).trim();
-					}
+				
+					String message = getMessageBody(command);
 	
-					stub.writeMessageAll(parts[1], message);
+					for (int shardId : FacebookRPCNode.getShardAddresses()) {
+						// TODO: add 2pc here
+						IFacebookServer shard = getShardFromShardAddress(shardId);
+						shard.writeMessageAll(login, message);
+					}
 					break;
 				case "read_message_all":
-					stub.readMessageAll(parts[1]);
+				{
+					IFacebookServer shard = getShardFromLogin(login);
+					shard.readMessageAll(parts[1]);
 					break;
+				}
 					
 				default:
 					assert false;
@@ -113,12 +130,15 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 			// Never say never =)
 		}
 	}
-	
-	public int getShardAddress(String user) {		
-		// Use a simplified division based on the first letter
-		int shardCount = FacebookRPCNode.getShardAddresses().size();
-		int hash = (int)user.charAt(0) - 'a';
-		return 1 + (hash*shardCount)/26;
+
+	private String getMessageBody(String command) {
+		String message = "";
+		int idx = command.indexOf(' ');
+		int nextIdx = command.indexOf(' ', idx+1);
+		if (idx != -1 && nextIdx != -1) {
+			message = command.substring(nextIdx, command.length()).trim();
+		}
+		return message;
 	}
 	
 	private String extractLoginFromCommand(String methodName, String[] parts) {
@@ -132,7 +152,14 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 		}
 	}
 
-	private IFacebookServer getShardFromAddress(int shardAddress) {
+	private IFacebookServer getShardFromLogin(String user) {
+		
+		int shardAddress = getShardAddress(user);
+		
+		return getShardFromShardAddress(shardAddress);
+	}
+	
+	private IFacebookServer getShardFromShardAddress(int shardAddress) {		
 		IFacebookServer stub;
 		// Get the proper stub for communication with the server
 		if (!m_stubs.containsKey(shardAddress))
@@ -148,6 +175,13 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 			stub = m_stubs.get(shardAddress);
 		}
 		return stub;
+	}
+	
+	public int getShardAddress(String user) {		
+		// Use a simplified division based on the first letter
+		int shardCount = FacebookRPCNode.getShardAddresses().size();
+		int hash = (int)user.charAt(0) - 'a';
+		return 1 + (hash*shardCount)/26;
 	}
 	
 	@Override

@@ -7,11 +7,11 @@ public interface IFacebookServer
 	String login(String username, String password) throws RPCException;
 	String logout(String token) throws RPCException;
 	
-	String addFriend_receiver(String adderLogin, String receiverLogin) throws RPCException;
+	String addFriendReceiver(String adderLogin, String receiverLogin) throws RPCException;
 	
-	String acceptFriend_adder(String token, String friendname) throws RPCException;
-	String acceptFriend_receiver(String adderLogin, String receiverLogin) throws RPCException;
+	String acceptFriendAdder(String token, String friendname) throws RPCException;
+	String acceptFriendReceiver(String adderLogin, String receiverLogin) throws RPCException;
 	
 	String readMessageAll(String token) throws RPCException;
-	String writeMessageAll(String username, String message) throws RPCException;
+	String writeMessageAll(String from, String message) throws RPCException;
 }
