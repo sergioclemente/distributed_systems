@@ -24,37 +24,36 @@ public class Stub_FacebookServer extends RPCStub implements IFacebookServer
 
 	public String createUser(String username, String password)
 	{
-		super.invoke("createUser", username, password);
+		super.invoke("create_user", username, password);
 		return null;
 	}
 	
-	public String addFriend(String username, String friendname)
+	public String addFriend_receiver(String username, String friendname)
 	{
-		super.invoke("addFriend", username, friendname);
+		super.invoke("add_friend_receiver", username, friendname);
 		return null;
 	}
 	
-	public String acceptFriend(String username, String friendname)
+	public String acceptFriend_receiver(String username, String friendname)
 	{
-		super.invoke("acceptFriend", username, friendname);
-		return null;
-	}
-
-	public String writeMessageOne(String username, String friendname, String message)
-	{
-		super.invoke("writeMessageOne", username, friendname, message);
+		super.invoke("accept_friend_receiver", username, friendname);
 		return null;
 	}
 	
-	public String writeMessageAll(String username, String message)
+	public String acceptFriend_adder(String username, String friendname)
 	{
-		super.invoke("writeMessageAll", username, message);
+		super.invoke("accept_friend_adder", username, friendname);
+		return null;
+	}
+		public String writeMessageAll(String username, String message)
+	{
+		super.invoke("write_message_all", username, message);
 		return null;
 	}
 	
 	public String readMessageAll(String username)
 	{
-		super.invoke("readMessageAll", username);
+		super.invoke("read_message_all", username);
 		return null;
 	}
 
@@ -72,23 +71,27 @@ public class Stub_FacebookServer extends RPCStub implements IFacebookServer
 			m_callback.reply_logout(replyId, sender, result, content);
 			break;
 			
-		case "createUser":
+		case "create_user":
 			m_callback.reply_createUser(replyId, sender, result, content);
 			break;
 
-		case "addFriend":
-			m_callback.reply_addFriend(replyId, sender, result, content);
+		case "add_friend_adder":
+			m_callback.reply_addFriend_receiver(replyId, sender, result, content);
 			break;
 			
-		case "acceptFriend":
-			m_callback.reply_acceptFriend(replyId, sender, result, content);
+		case "accept_friend_adder":
+			m_callback.reply_acceptFriend_adder(replyId, sender, result, content);
 			break;
 			
-		case "writeMessageAll":
+		case "accept_friend_receiver":
+			m_callback.reply_acceptFriend_receiver(replyId, sender, result, content);
+			break;
+			
+		case "write_message_all":
 			m_callback.reply_writeMessageAll(replyId, sender, result, content);
 			break;
 			
-		case "readMessageAll":
+		case "read_message_all":
 			m_callback.reply_readMessageAll(replyId, sender, result, content);
 			break;
 			

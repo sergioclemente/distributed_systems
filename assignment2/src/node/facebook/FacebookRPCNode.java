@@ -7,171 +7,74 @@ import node.rpc.RPCNode;
 import node.rpc.I2pcParticipant;
 import node.twophasecommit.TwoPhaseCommitNode;
 
-
 public class FacebookRPCNode extends RPCNode {
-	private FacebookShardSystem m_system;
-	private FacebookFrontendSystem m_client;
-	private TwoPhaseCommitNode m_2pcCoord;
-	
-	private final static int[] SHARDS_ADDRESSES = new int[] {0,1,2,3,4,5};
-	
-	public static final String ERROR_MESSAGE_FORMAT = 
-			"Error: %s on facebook server %d. Returned error code was %s";
-	
+	private FacebookShardSystem m_shard;
+	private FacebookFrontendSystem m_frontEnd;
+	private TwoPhaseCommitNode m_twoPhase;
+
+	private static Vector<Integer> s_shardAddresses = new Vector<Integer>();
+
+	public static final String ERROR_MESSAGE_FORMAT = "Error: %s on facebook server %d. Returned error code was %s";
+
 	public FacebookRPCNode() {
 		super();
 	}
-	
-	
+
 	@Override
 	public void start() {
 		super.start();
-		
-		this.info("Starting frontend instance on address " + this.addr);
-		this.m_client = new FacebookFrontendSystem(this);
 
-		this.info("Starting sharding instance on address " + this.addr);
-		this.m_system = new FacebookShardSystem(this);
-
-		this.info("Starting 2PC coordinator support on address " + this.addr);
-		this.m_2pcCoord = new TwoPhaseCommitNode(this);
-		
-		// Enable this node to receive RPC calls for these interfaces
-		this.bindFacebookServerImpl(m_system);
-		this.bind2pcCoordinatorImpl(m_2pcCoord);
-		this.bind2pcParticipantImpl((I2pcParticipant) m_2pcCoord);
-		
-		// Replay the file in memory
-		this.m_system.recoverFromCrash();
-	}
-	
-	@Override
-	public void onCommand(String command)
-	{
-		boolean handled;
-		
-		// Let the facebook frontend take the first crack
-		handled = m_client.onCommand(command);
-		
-		if (!handled)
-		{
-			// See if the 2PC coordinator can handle this command
-			handled = m_2pcCoord.onCommand(command);
-		}
-		
-		/*
-		// TODO: the queuing logic is not in place
-		try {
-			RPCMethodCall methodCall = this.m_system.parseRPCMethodCall(command);
-			
-			// If this node is the frontend?
-			if (this.isFrontEnd()) {
-				// Can the frontend handle this command?
-				if (this.m_system.canCallLocalMethod(methodCall.getMethodName(), methodCall.getParams())) {
-					this.m_system.callLocalMethod(methodCall.getMethodName(), methodCall.getParams());
-				} else {
-					this.routeToAppropriateShards(methodCall.getMethodName(), methodCall.getParams());
-				}
-			} else {
-				// Shards are currently not supporting commands
-				throw new FacebookException(FacebookException.CANNOT_EXECUTE_COMMANDS_ON_SHARDS);
-			}
-		} catch (FacebookException ex) {
-			ex.printStackTrace();
-		}
-		*/
-	}
-	
-	public int[] getAppropriateShards(String methodName, String token) {
-		User user = null;
-		int[] shards;
-		
-		//try
-		{
-			// Validate the session
-			//m_system.getUser(token);
-
-			// write_message_all will broadcast to all shards
-			if (methodName.startsWith("write_message_all")) {
-				shards = SHARDS_ADDRESSES;
-			} else {
-				// select a shard based on the user's login hash
-				//int shardAddress =  user.getLogin().hashCode() % SHARDS_ADDRESSES.length;
-				
-				int shardAddress;
-				shardAddress = token.toLowerCase().hashCode();
-				shardAddress = shardAddress % SHARDS_ADDRESSES.length;
-				shards = new int[] { shardAddress };
-			}
-		}
-		//catch (FacebookException ex)
-		//{
-		//	shards = new int[] {};
-		//}
-		
-		return shards;
-		
-		/*
-		// Validate the session
-		FacebookFrontendSystem frontendSystem = (FacebookFrontendSystem)this.m_system;
-		String token = params.get(0);
-		User user = frontendSystem.getUser(token);
-		
-		// Update the first argument from token to user
-		params.set(0, user.getLogin());
-		
-		// write_message_all will broadcast to all shards
-		if (methodName.startsWith("write_message_all")) {
-			for (int shardAddr : SHARDS_ADDRESSES) {
-				this.callMethod(shardAddr, methodName, params);
-			}			
+		if (this.addr == 0) {
+			this.user_info("Starting frontend instance on address " + this.addr);
+			this.m_frontEnd = new FacebookFrontendSystem(this);
 		} else {
-			// read_message_all will read from a specific shard
-			int shardAddress =  user.getLogin().hashCode() % SHARDS_ADDRESSES.length;
-			this.callMethod(shardAddress, methodName, params);
+			this.user_info("Starting sharding instance on address " + this.addr);
+			this.m_shard = new FacebookShardSystem(this);
+			s_shardAddresses.add(this.addr);
 		}
-		*/
+
+		this.user_info("Starting 2PC coordinator support on address " + this.addr);
+		this.m_twoPhase = new TwoPhaseCommitNode(this);
+
+		// Enable this node to receive RPC calls for these interfaces
+		this.bindFacebookServerImpl(m_shard);
+		this.bind2pcCoordinatorImpl(m_twoPhase);
+		this.bind2pcParticipantImpl((I2pcParticipant) m_twoPhase);
+
+		if (this.m_shard != null) {
+			this.m_shard.recoverFromCrash();
+		}
 	}
 	
-	/*
+	public static Vector<Integer> getShardAddresses() {
+		return s_shardAddresses;
+	}
+
 	@Override
-	protected void onMethodCalled(int from, String methodName, Vector<String> params) {
-		try {
-			if (this.isFrontEnd()) {
-				if (methodName.equals("endCallback")) {
-					// TODO: do a better job here on handling multiple values
-					this.m_system.info("Receive return from shard");
-					for (int i = 0; i < params.size(); i++) {
-						System.out.println(params.get(i));
-					}
-					
-					// TODO: do not have logic of waiting for all shards in order to send next command
-				} else {
-					// TODO: not sure yet if need this since it would need 3 types of nodes to exercise this codepath
-				}
-			} else {
-				assert this.m_system.canCallLocalMethod(methodName, params);
-				String returnValue = this.m_system.callLocalMethod(methodName, params);
-				Vector<String> returnParams = new Vector<String>();
-				returnParams.add(methodName);
-				returnParams.add("ok");
-				returnParams.add(returnValue);
-				this.callMethod(from, "endCallback", returnParams);
-			}
-		} catch (FacebookException ex) {
-			Vector<String> returnParams = new Vector<String>();
-			returnParams.add(methodName);
-			returnParams.add("error");
-			returnParams.add(new Integer(ex.getExceptionCode()).toString());
-			
-			this.callMethod(from, "endCallback", returnParams);
+	public void onCommand(String command) {
+		boolean handled = false;
+
+		// Let the facebook frontend take the command first
+		// TODO: move this to a chain of responsibility
+		if (this.m_frontEnd != null) {
+			handled = m_frontEnd.onCommand(command);
 		}
+
+		if (!handled) {
+			// See if the 2PC coordinator can handle this command
+			handled = m_twoPhase.onCommand(command);
+		}
+
+		// TODO: queue logic not in place
 	}
-	*/
-	
+
 	@Override
 	protected void onConnectionAborted(int endpoint) {
-		this.m_system.user_info("connection aborted!");
+		this.user_info("connection aborted!");
 	}
-	
+
+	private void user_info(String s) {
+		// Use a different prefix to be easy to distinguish
+		System.out.println(">>>> " + s);
+	}
 }

@@ -1,5 +1,6 @@
 package node.facebook;
 
+import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.List;
 import java.util.Set;
@@ -10,11 +11,9 @@ import node.rpc.IFacebookServer;
 public class FacebookShardSystem extends BaseFacebookSystem implements IFacebookServer {
 
 	private Hashtable<String, User> m_users = new Hashtable<String, User>();
-	private Hashtable<String, String> m_activeSessions = new Hashtable<String, String>();
+	private Set<String> m_activeSessions = new HashSet<String>();
 	private Hashtable<String, List<String>> m_friends = new Hashtable<String, List<String>>();
-	private Hashtable<String, List<String>> m_friendRequests = new Hashtable<String, List<String>>();
-	
-	// Distributed nodes
+	private Hashtable<String, List<String>> m_pendingFriendRequests = new Hashtable<String, List<String>>();
 	private Hashtable<String, Vector<Message>> m_messages = new Hashtable<String, Vector<Message>>();
 	
 	/**
@@ -38,7 +37,7 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 			// Create auxiliary data structures now.
 			// Makes the code cleaner than lazy creation.
 			this.m_friends.put(username, new Vector<String>());
-			this.m_friendRequests.put(username, new Vector<String>());
+			this.m_pendingFriendRequests.put(username, new Vector<String>());
 		}
 		
 		return null;
@@ -49,8 +48,8 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 	 */
 	public String login(String username, String password) throws FacebookException {
 		if (this.isValidUser(username)) {
-			String token = createNewSessionId();
-			this.m_activeSessions.put(token, username);
+			String token = new SessionToken(username, createNewSessionSeed()).toString();
+			this.m_activeSessions.add(token);
 			this.user_info("User: " + username + " logged in, token: " + token);
 			return token;
 		} else {
@@ -62,7 +61,7 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 	 * API: IFacebookServer.logout
 	 */
 	public String logout(String token) throws FacebookException {
-		if (this.m_activeSessions.containsKey(token)) {
+		if (this.m_activeSessions.contains(token)) {
 			this.m_activeSessions.remove(token);
 			this.user_info("Token: " + token + " logged out");
 		} else {
@@ -72,26 +71,21 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 		return null;
 	}
 	
-	/**
-	 * API: IFacebookServer.addFriend
-	 */
-	public String addFriend(String token, String friendLogin) throws FacebookException {
-		String login = this.getUser(token).getLogin();
-		
-		if (!this.isValidUser(friendLogin)) {
+	public String addFriend_receiver(String adderLogin, String receiverLogin) throws FacebookException {
+		if (!this.isValidUser(receiverLogin)) {
 			throw new FacebookException(FacebookException.USER_DONT_EXIST);
 		}
 		
 		// Only add to log valid friend requests 
-		this.appendToLog("add_friend " + login + " " + friendLogin);
+		this.appendToLog("add_friend " + adderLogin + " " + receiverLogin);
 
 		// Get the *friend's* request list
 		List<String> listFriends;
-		listFriends = this.m_friendRequests.get(friendLogin);
+		listFriends = this.m_pendingFriendRequests.get(receiverLogin);
 		
 		// Add the user to the friend's request list
-		listFriends.add(login);
-		this.user_info("User: " + login + " requested to be friends of user " + friendLogin);
+		listFriends.add(adderLogin);
+		this.user_info("User: " + adderLogin + " requested to be friends of user " + receiverLogin);
 		
 		return null;
 	}
@@ -99,30 +93,31 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 	/**
 	 * API: IFacebookServer.acceptFriend
 	 */
-	public String acceptFriend(String token, String friendLogin) throws FacebookException {
-		String login = this.getUser(token).getLogin();
-		
-		if (!this.isValidUser(friendLogin)) {
-			throw new FacebookException(FacebookException.USER_DONT_EXIST);
-		}
-		
+	public String acceptFriend_receiver(String adderLogin, String receiverLogin) throws FacebookException {
 		List<String> requestList;
-		requestList = this.m_friendRequests.get(login);
+		requestList = this.m_pendingFriendRequests.get(receiverLogin);
 		
-		User friendUser;
-		friendUser = this.m_users.get(friendLogin);
-		
-		if (!requestList.contains(friendLogin)) {
+		if (!requestList.contains(adderLogin)) {
 			// Can't accept friendship of somebody who hasn't requested it
 			throw new FacebookException(FacebookException.INVALID_REQUEST);
 		}
 		
-		this.appendToLog("accept_friend " + login + " " + friendLogin);
+		this.appendToLog("accept_friend_receiver " + adderLogin + " " + receiverLogin);
 		
-		requestList.remove(friendUser);
-		addFriendToList(login, friendLogin);
-		addFriendToList(friendLogin, login);
-		this.user_info("User: " + login + " accepted to be friends of user " + friendLogin);
+		requestList.remove(adderLogin);
+		addFriendToList(receiverLogin, adderLogin);
+		this.user_info("(Receiver) User: " + receiverLogin + " accepted to be friends of user " + adderLogin);
+		
+		return null;
+	}
+	
+	public String acceptFriend_adder(String token, String adderLogin) throws FacebookException {
+		String receiverLogin = extractUserLogin(token);
+				
+		this.appendToLog("accept_friend_adder " + receiverLogin + " " + adderLogin);
+		
+		addFriendToList(adderLogin, receiverLogin);
+		this.user_info("(Adder) User: " + adderLogin + " accepted to be friends of user " + receiverLogin);
 		
 		return null;
 	}
@@ -138,37 +133,29 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 		}
 	}
 
-	private String createNewSessionId()
+	private String createNewSessionSeed()
 	{
-		StringBuffer sb = new StringBuffer();
-		for (int i = 0 ; i < 10 ; i++) {
-			sb.append(Character.toChars('0' + Utility.getRNG().nextInt(10)));
-		}
-		return sb.toString();
+		// TODO: temporary just to make debugging easier
+		return "123";
+//		StringBuffer sb = new StringBuffer();
+//		for (int i = 0 ; i < 10 ; i++) {
+//			sb.append(Character.toChars('0' + Utility.getRNG().nextInt(10)));
+//		}
+//		return sb.toString();
 	}
 
-	private boolean isLoggedIn(String token)
+	private String extractUserLogin(String token) throws FacebookException
 	{
-		return this.m_activeSessions.containsKey(token);
-	}
-
-	private boolean isValidUser(String username)
-	{
-		return this.m_users.containsKey(username);
-	}
-	
-	public User getUser(String token) throws FacebookException {
-		// In recovery the parameter actually will be the login
-		if (this.m_inRecovery) {
-			return this.m_users.get(token); 
-		}
-		
-		if (this.isLoggedIn(token)) {
-			String login = this.m_activeSessions.get(token);
-			return this.m_users.get(login);
-		} else {
+		if (!this.m_activeSessions.contains(token)) {
 			throw new FacebookException(FacebookException.SESSION_DONT_EXIST);
 		}
+		
+		return SessionToken.createFromString(token).getUser();
+	}
+
+	private boolean isValidUser(String login)
+	{
+		return this.m_users.containsKey(login);
 	}
 	
 	/**
@@ -192,10 +179,9 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 	/**
 	 * API: IFacebookServer.readMessageAll
 	 */
-	public String readMessageAll(String login) throws FacebookException {
-		if (!this.m_messages.containsKey(login)) {
-			return null;
-		}
+	public String readMessageAll(String token) throws FacebookException {
+		String login = extractUserLogin(token);
+
 		Vector<Message> messages = this.m_messages.get(login);
 		StringBuffer sb = new StringBuffer();
 

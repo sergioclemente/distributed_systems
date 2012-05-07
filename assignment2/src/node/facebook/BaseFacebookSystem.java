@@ -55,7 +55,7 @@ public abstract class BaseFacebookSystem {
 
 	protected void user_info(String s) {
 		// Use a different prefix to be easy to distinguish
-		System.out.println(">>>> " + s);
+		System.out.println(">>>> " + this.m_node.addr + " - "+ s);
 	}
 	
 	protected RPCMethodCall parseRPCMethodCall(String command) {

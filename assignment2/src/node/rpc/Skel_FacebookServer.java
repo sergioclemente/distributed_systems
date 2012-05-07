@@ -32,23 +32,26 @@ public class Skel_FacebookServer extends RPCSkeleton
 			content = m_impl.logout(methodArgs.get(0));
 			break;
 			
-		case "createUser":
+		case "create_user":
 			content = m_impl.createUser(methodArgs.get(0), methodArgs.get(1));
 			break;
 			
-		case "addFriend":
-			content = m_impl.addFriend(methodArgs.get(0), methodArgs.get(1));
+		case "add_friend_receiver":
+			content = m_impl.addFriend_receiver(methodArgs.get(0), methodArgs.get(1));
 			break;
 			
-		case "acceptFriend":
-			content = m_impl.acceptFriend(methodArgs.get(0), methodArgs.get(1));
+		case "accept_friend_adder":
+			content = m_impl.acceptFriend_adder(methodArgs.get(0), methodArgs.get(1));
 			break;
 			
-		case "writeMessageAll":
+		case "accept_friend_receiver":
+			content = m_impl.acceptFriend_receiver(methodArgs.get(0), methodArgs.get(1));
+			break;			
+		case "write_wessage_all":
 			content = m_impl.writeMessageAll(methodArgs.get(0), methodArgs.get(1));
 			break;
 			
-		case "readMessageAll":
+		case "read_message_all":
 			content = m_impl.readMessageAll(methodArgs.get(0));
 			break;
 			
@@ -65,12 +68,12 @@ public class Skel_FacebookServer extends RPCSkeleton
 	{
 		node.bindRpcMethod("login", this);
 		node.bindRpcMethod("logout", this);
-		node.bindRpcMethod("createUser", this);
-		node.bindRpcMethod("addFriend", this);
-		node.bindRpcMethod("acceptFriend", this);
-		node.bindRpcMethod("writeMessageOne", this);
-		node.bindRpcMethod("writeMessageAll", this);
-		node.bindRpcMethod("readMessageAll", this);
+		node.bindRpcMethod("create_user", this);
+		node.bindRpcMethod("add_friend_receiver", this);
+		node.bindRpcMethod("accept_friend_adder", this);
+		node.bindRpcMethod("accept_friend_receiver", this);
+		node.bindRpcMethod("write_message_all", this);
+		node.bindRpcMethod("read_message_all", this);
 	}
 }
 

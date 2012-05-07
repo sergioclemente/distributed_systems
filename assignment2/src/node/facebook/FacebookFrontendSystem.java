@@ -26,134 +26,128 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 	 * @param command
 	 */
 	public boolean onCommand(String command)
-	{
-		IFacebookServer stub;
-		Integer serverAddr;
-		boolean handled = false;
-		
+	{	
 		String[] parts = command.split("\\s+");
+		
+		String methodName = parts[0];
+		
+		if (!canHandle(methodName)) {
+			return false;
+		}
+		
+		callMethodOnShards(command, parts);
+		
+		return true;
+	}
 
-		// Attempt to parse a server id from the first token.
-		// This can be used either for debugging purposes, or we
-		// could always auto-redirect to the right shard regardless
-		// of the node receiving the command.
-		// Currently we only auto-redirect if no specific shard was
-		// provided in the command line.
+	private boolean canHandle(String methodName) {
+		return methodName.equals("login") || methodName.equals("logout") ||
+				methodName.equals("create_user") || methodName.equals("add_friend") ||
+				methodName.equals("accept_friend") || methodName.equals("read_message_all") ||
+				methodName.equals("write_message_all");
+	}
+
+	private void callMethodOnShards(String command, String[] parts) {
+		String methodName = parts[0];
+		
+		String login = extractLoginFromCommand(methodName, parts).toLowerCase();
+		
+		IFacebookServer stub = getShardFromAddress(getShardAddress(login));
 		
 		try
 		{
-			serverAddr = Integer.parseInt(parts[0]);
-			
-			// Clone the array but skip the first element 
-			String[] parts2 = new String[parts.length-1];
-			for (int i=1; i<parts.length; i++)
-				parts2[i-1] = parts[i];
-			
-			parts = parts2;
+			String op = parts[0].toLowerCase();
+			switch(op) {
+				case "login":
+					stub.login(parts[1], parts[2]);
+					break;
+				case "logout":
+					stub.logout(parts[1]);
+					break;
+				case "create_user":
+					stub.createUser(parts[1], parts[2]);
+					break;
+				case "add_friend":
+				{
+					String adderLogin = login;
+					String receiverLogin = parts[2];
+					IFacebookServer stubReceiver = getShardFromAddress(getShardAddress(receiverLogin));
+					stubReceiver.addFriend_receiver(adderLogin, receiverLogin);
+					break;
+				}
+				case "accept_friend":
+				{
+					String receiverLogin = login;
+					String adderLogin = parts[2];
+					IFacebookServer stubAdder = getShardFromAddress(getShardAddress(adderLogin));
+					stub.acceptFriend_receiver(adderLogin, receiverLogin);
+					stubAdder.acceptFriend_receiver(adderLogin, receiverLogin);
+					break;
+				}
+				case "write_message_all":
+					// TODO: write_message_all should only contact shards that actually
+					// contain friends of the user.
+					String message = "";
+					
+					// The write_message_all command is special because it can contain spaces
+					// TODO: not very clean approach. Think about how making this in the subclasses
+					int idx = command.indexOf(' ');
+					int nextIdx = command.indexOf(' ', idx+1);
+					if (idx != -1 && nextIdx != -1) {
+						message = command.substring(nextIdx, command.length()).trim();
+					}
+	
+					stub.writeMessageAll(parts[1], message);
+					break;
+				case "read_message_all":
+					stub.readMessageAll(parts[1]);
+					break;
+					
+				default:
+					assert false;
+			}
 		}
-		catch (NumberFormatException ex)
+		catch (RPCException ex)
 		{
-			// If no specific server was provided, auto-redirect 
-			serverAddr = -1;
+			// Never happens
+			// Never say never =)
 		}
-		
-		// Handle auto-redirection to the appropriate server,
-		// unless a specific recipient was explicitly provided
-		// (see above).
-		
-		int[] shards;
-		if (serverAddr == -1)
+	}
+	
+	public int getShardAddress(String user) {		
+		// Use a simplified division based on the first letter
+		int shardCount = FacebookRPCNode.getShardAddresses().size();
+		int hash = (int)user.charAt(0) - 'a';
+		return 1 + (hash*shardCount)/26;
+	}
+	
+	private String extractLoginFromCommand(String methodName, String[] parts) {
+		// login and create_user receive the username directly
+		// the other commands receive the session instead
+		if (methodName.equals("login") || methodName.equals("create_user")) {
+			return parts[1];
+		} else {
+			SessionToken token = SessionToken.createFromString(parts[1]);
+			return token.getUser();
+		}
+	}
+
+	private IFacebookServer getShardFromAddress(int shardAddress) {
+		IFacebookServer stub;
+		// Get the proper stub for communication with the server
+		if (!m_stubs.containsKey(shardAddress))
 		{
-			shards = m_node.getAppropriateShards(parts[0], parts[1]);
+			// NOTE: we create a different stub per server connection,
+			// but in the end all replies are handled by the same
+			// object ("this" one).
+			stub = m_node.connectToFacebookServer(shardAddress, this);
+			m_stubs.put(shardAddress, stub);
 		}
 		else
 		{
-			shards = new int[] { serverAddr };
+			stub = m_stubs.get(shardAddress);
 		}
-		
-		
-		// Execute the command on every shard.
-		// Most commands will run on only one shard, but write_message_all
-		// will be sent to all of them.
-		// TODO: write_message_all should only contact shards that actually
-		// contain friends of the user.
-		
-		for (int shard : shards)
-		{
-			// Get the proper stub for communication with the server
-			if (!m_stubs.containsKey(shard))
-			{
-				// NOTE: we create a different stub per server connection,
-				// but in the end all replies are handled by the same
-				// object ("this" one).
-				stub = m_node.connectToFacebookServer(shard, this);
-				m_stubs.put(shard, stub);
-			}
-			else
-			{
-				stub = m_stubs.get(shard);
-			}
-			
-			// Invoke the command on the server
-			try
-			{
-				String op = parts[0].toLowerCase();
-				switch(op) {
-					case "logout":
-						stub.logout(parts[1]);
-						handled = true;
-						break;
-						
-					case "create_user":
-						stub.createUser(parts[1], parts[2]);
-						handled = true;
-						break;
-						
-					case "add_friend":
-						stub.addFriend(parts[1], parts[2]);
-						handled = true;
-						break;
-						
-					case "accept_friend":
-						stub.acceptFriend(parts[1], parts[2]);
-						handled = true;
-						break;
-						
-					case "write_message_all":
-						String message = "";
-						
-						// The write_message_all command is special because it can contain spaces
-						// TODO: not very clean approach. Think about how making this in the subclasses
-						int idx = command.indexOf(' ');
-						int nextIdx = command.indexOf(' ', idx+1);
-						if (idx != -1 && nextIdx != -1) 
-							message = command.substring(nextIdx, command.length()).trim();
-		
-						stub.writeMessageAll(parts[1], message);
-						handled = true;
-						break;
-						
-					case "read_message_all":
-						stub.readMessageAll(parts[1]);
-						handled = true;
-						break;
-						
-					default:
-						user_info(String.format("Unknown command: " + parts[0]));
-				}
-			}
-			catch (RPCException ex)
-			{
-				// Never happens
-			}
-			catch (IndexOutOfBoundsException ex2)
-			{
-				user_info("Invalid syntax for command: " + parts[0]);
-			}
-		}
-		
-		// If returning false here, the command will be passed along to another handler.
-		return handled;
+		return stub;
 	}
 	
 	@Override
@@ -202,12 +196,12 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 	}
 
 	@Override
-	public void reply_addFriend(int replyId, int sender, int result, String reply)
+	public void reply_addFriend_receiver(int replyId, int sender, int result, String reply)
 	{
 		if (result == 0)
 		{
 			// RPC call succeeded
-			user_info("add_friend: Server returned ok. returnValue=" + reply);
+			user_info("add_friend_receiver: Server returned ok. returnValue=" + reply);
 		}
 		else
 		{
@@ -217,12 +211,12 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 	}
 
 	@Override
-	public void reply_acceptFriend(int replyId, int sender, int result, String reply)
+	public void reply_acceptFriend_adder(int replyId, int sender, int result, String reply)
 	{
 		if (result == 0)
 		{
 			// RPC call succeeded
-			user_info("accept_friend: Server returned ok. returnValue=" + reply);
+			user_info("accept_friend_adder: Server returned ok. returnValue=" + reply);
 		}
 		else
 		{
@@ -231,6 +225,21 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 		}
 	}
 
+	@Override
+	public void reply_acceptFriend_receiver(int replyId, int sender, int result, String reply)
+	{
+		if (result == 0)
+		{
+			// RPC call succeeded
+			user_info("accept_friend_receiver: Server returned ok. returnValue=" + reply);
+		}
+		else
+		{
+			// RPC call failed
+			onMethodFailed(sender, "accept_friend", result);
+		}
+	}
+	
 	@Override
 	public void reply_writeMessageAll(int replyId, int sender, int result, String reply)
 	{
