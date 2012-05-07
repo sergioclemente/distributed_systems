@@ -200,7 +200,7 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 	public int getShardAddress(String user) {		
 		// Use a simplified division based on the first letter
 		int shardCount = FacebookRPCNode.getShardAddresses().size();
-		int hash = (int)user.charAt(0) - 'a';
+		int hash = (int)Character.toLowerCase(user.charAt(0)) - 'a';
 		return 1 + (hash*shardCount)/26;
 	}
 	
