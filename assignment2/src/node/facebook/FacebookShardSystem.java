@@ -115,12 +115,16 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 	}
 	
 	public String acceptFriendAdder(String token, String adderLogin) throws FacebookException {
-		String receiverLogin = extractUserLogin(token);
+		// TODO: either remove session tokens, or auto-add session token to 'receiverLogin'
+		//String receiverLogin = extractUserLogin(token);
+		if (!isValidUser(token))
+			throw new FacebookException(FacebookException.SESSION_DONT_EXIST);
+		String receiverLogin = token;
 				
 		this.appendToLog("accept_friend_adder " + receiverLogin + " " + adderLogin);
 		
-		addFriendToList(adderLogin, receiverLogin);
-		this.user_info("(Adder) User: " + adderLogin + " accepted to be friends of user " + receiverLogin);
+		addFriendToList(receiverLogin, adderLogin);
+		this.user_info("(Adder) User: " + receiverLogin + " was auto-added as friends of user " + adderLogin);
 		
 		return null;
 	}

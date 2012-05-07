@@ -32,7 +32,7 @@ public abstract class RPCStub
 		}
 	}
 	
-	public int getCurrentReplyId()
+	public static int getCurrentReplyId()
 	{
 		return s_replyId;
 	}

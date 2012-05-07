@@ -16,6 +16,12 @@ public class FacebookRPCNode extends RPCNode {
 
 	public static final String ERROR_MESSAGE_FORMAT = "Error: %s on facebook server %d. Returned error code was %s";
 
+	static {
+		for (int i = 0; i <= 5; i++) {
+			s_shardAddresses.add(i);
+		}
+	}
+	
 	public FacebookRPCNode() {
 		super();
 	}
@@ -23,15 +29,12 @@ public class FacebookRPCNode extends RPCNode {
 	@Override
 	public void start() {
 		super.start();
-
-		if (this.addr == 0) {
-			this.user_info("Starting frontend instance on address " + this.addr);
-			this.m_frontEnd = new FacebookFrontendSystem(this);
-		} else {
-			this.user_info("Starting sharding instance on address " + this.addr);
-			this.m_shard = new FacebookShardSystem(this);
-			s_shardAddresses.add(this.addr);
-		}
+		
+		this.user_info("Starting frontend instance on address " + this.addr);
+		this.m_frontEnd = new FacebookFrontendSystem(this);
+		
+		this.user_info("Starting sharding instance on address " + this.addr);
+		this.m_shard = new FacebookShardSystem(this);
 
 		this.user_info("Starting 2PC coordinator support on address " + this.addr);
 		this.m_twoPhase = new TwoPhaseCommitNode(this);
@@ -64,8 +67,6 @@ public class FacebookRPCNode extends RPCNode {
 			// See if the 2PC coordinator can handle this command
 			handled = m_twoPhase.onCommand(command);
 		}
-
-		// TODO: queue logic not in place
 	}
 
 	@Override

@@ -4,12 +4,25 @@ import java.util.Vector;
 import node.rpc.IFacebookServer;
 import node.rpc.IFacebookServerReply;
 import node.rpc.RPCException;
+import node.rpc.RPCStub;
 
 
 public class FacebookFrontendSystem extends BaseFacebookSystem implements IFacebookServerReply
 {
+	// PendingAcceptFriendInfo stores info about ongoing accept_friend requests.
+	// Once we get acknowledgement that the receiver accepted the adder's request
+	// we send another accept_friend request to make the adder add the receiver 
+	// as well.
+	private class PendingAcceptFriendInfo
+	{
+		String loginAdder;
+		String loginReceiver;
+		IFacebookServer shardAdder;
+	};
+	
 	private Hashtable<Integer, IFacebookServer> m_stubs = new Hashtable<Integer, IFacebookServer>();
-
+	private Hashtable<Integer, PendingAcceptFriendInfo> m_pendingAcceptFriend = new Hashtable<Integer, PendingAcceptFriendInfo>();
+	
 	/**
 	 * FacebookFrontendSystem()
 	 * @param node
@@ -96,9 +109,16 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 					IFacebookServer shardReceiver = getShardFromLogin(login);
 					IFacebookServer shardAdder = getShardFromLogin(adderLogin);
 					
-					// TODO: Add 2pc here
+					// Send the accept_friend command
 					shardReceiver.acceptFriendReceiver(adderLogin, receiverLogin);
-					shardAdder.acceptFriendReceiver(adderLogin, receiverLogin);
+					
+					// Store this info so that we can process the 2nd part once the
+					// 1st part succeeds
+					PendingAcceptFriendInfo info = new PendingAcceptFriendInfo();
+					info.loginAdder = adderLogin;
+					info.loginReceiver = receiverLogin;
+					info.shardAdder = shardAdder;
+					m_pendingAcceptFriend.put(RPCStub.getCurrentReplyId(), info);
 					break;
 				}
 				case "write_message_all":
@@ -126,8 +146,8 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 		}
 		catch (RPCException ex)
 		{
-			// Never happens
-			// Never say never =)
+			// Stubs shouldn't throw, but java forces the try/catch block
+			// because remote implementations can throw.
 		}
 	}
 
@@ -266,6 +286,22 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 		{
 			// RPC call succeeded
 			user_info("accept_friend_receiver: Server returned ok. returnValue=" + reply);
+			
+			// Now that the receiver accepted the friend request from the adder,
+			// make it so the adder also adds the receiver as friend.
+			if (m_pendingAcceptFriend.containsKey(replyId))
+			{
+				try 
+				{
+					PendingAcceptFriendInfo info = m_pendingAcceptFriend.get(replyId);
+					info.shardAdder.acceptFriendAdder(info.loginAdder, info.loginReceiver);
+					m_pendingAcceptFriend.remove(replyId);
+				} 
+				catch (RPCException e) 
+				{
+					// Should not happen
+				}
+			}
 		}
 		else
 		{
@@ -310,5 +346,4 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 		String errorMsg = String.format(FacebookRPCNode.ERROR_MESSAGE_FORMAT, methodName, from, result);
 		user_info(String.format("NODE %d: %s", m_node.addr, errorMsg));
 	}
-		
 }
