@@ -1,5 +1,6 @@
 package node.facebook;
 
+import java.io.IOException;
 import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.List;
@@ -7,10 +8,50 @@ import java.util.Set;
 import java.util.Vector;
 import edu.washington.cs.cse490h.lib.Utility;
 import node.rpc.IFacebookServer;
+import node.rpc.RPCMethodCall;
+import edu.washington.cs.cse490h.lib.PersistentStorageReader;
+import edu.washington.cs.cse490h.lib.PersistentStorageWriter;
+
 
 public class FacebookShardSystem extends BaseFacebookSystem implements IFacebookServer {
 
 	private FacebookShardState m_state = new FacebookShardState();
+	
+	private static final String FILE_NAME = "facebookstate.txt";
+	
+	private void saveState() {
+		try {
+			String content = FacebookShardState.serialize(m_state);
+			
+			PersistentStorageWriter psw = m_node.getWriter(FILE_NAME, false);
+			psw.write(content);
+			psw.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	public void recoverFromCrash() {
+		try {
+			if (Utility.fileExists(m_node, FILE_NAME)) {
+				PersistentStorageReader psr = m_node.getReader(FILE_NAME);
+				char[] buffer = new char[1024];
+				StringBuffer sb = new StringBuffer();
+				do {
+					int len = psr.read(buffer, 0, 1024);
+					if (len > 0) {
+						sb.append(buffer, 0, len);
+					} else {
+						break;
+					}
+				} while (true);
+				
+				this.m_state = FacebookShardState.deserialize(sb.toString());
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
 	
 	/**
 	 * FacebookShardSystem()
@@ -27,9 +68,8 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 		if (this.m_state.containsUser(userName)) {
 			throw new FacebookException(FacebookException.USER_ALREADY_EXISTS);
 		} else {
-			this.appendToLog("create_user " + userName + " " + password);
 			this.m_state.addUser(userName, new User(userName, password));
-						
+			this.saveState();		
 			this.user_info("created user " + userName + " " + password);
 		}
 		
@@ -43,6 +83,8 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 		if (this.m_state.containsUser(userName)) {
 			String token = new SessionToken(userName, createNewSessionSeed()).toString();
 			this.m_state.addSession(token);
+			
+			this.saveState();
 			this.user_info("User: " + userName + " logged in, token: " + token);
 			return token;
 		} else {
@@ -56,6 +98,8 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 	public String logout(String token) throws FacebookException {
 		if (this.m_state.containsSession(token)) {
 			this.m_state.removeSession(token);
+			
+			this.saveState();
 			this.user_info("Token: " + token + " logged out");
 		} else {
 			throw new FacebookException(FacebookException.SESSION_DONT_EXIST);
@@ -68,9 +112,6 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 		if (!this.m_state.containsUser(receiverLogin)) {
 			throw new FacebookException(FacebookException.USER_DONT_EXIST);
 		}
-		
-		// Only add to log valid friend requests 
-		this.appendToLog("add_friend " + adderLogin + " " + receiverLogin);
 
 		// Get the *friend's* request list
 		List<String> listFriends;
@@ -78,6 +119,8 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 		
 		// Add the user to the friend's request list
 		listFriends.add(adderLogin);
+		
+		this.saveState();
 		this.user_info("User: " + adderLogin + " requested to be friends of user " + receiverLogin);
 		
 		return null;
@@ -95,10 +138,10 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 			throw new FacebookException(FacebookException.INVALID_REQUEST);
 		}
 		
-		this.appendToLog("accept_friend_receiver " + adderLogin + " " + receiverLogin);
-		
 		requestList.remove(adderLogin);
 		this.m_state.addFriendToList(receiverLogin, adderLogin);
+		
+//		this.saveState();
 		this.user_info("(Receiver) User: " + receiverLogin + " accepted to be friends of user " + adderLogin);
 		
 		return null;
@@ -111,10 +154,10 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 		if (!this.m_state.containsUser(receiverLogin)) {
 			throw new FacebookException(FacebookException.SESSION_DONT_EXIST);
 		}
-				
-		this.appendToLog("accept_friend_adder " + receiverLogin + " " + adderLogin);
 		
 		this.m_state.addFriendToList(receiverLogin, adderLogin);
+		
+		this.saveState();
 		this.user_info("(Adder) User: " + receiverLogin + " was auto-added as friends of user " + adderLogin);
 		
 		return null;
@@ -124,7 +167,7 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 
 	private String createNewSessionSeed()
 	{
-		// Let's return a fixed value to make our live easier 
+		// Let's return a fixed value to make our life easier 
 		return "1234";
 	}
 
@@ -153,7 +196,7 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 			}
 		}
 
-		this.appendToLog("write_message_all " + from + " " + message);
+		this.saveState();
 		
 		// Nothing to return
 		return null;

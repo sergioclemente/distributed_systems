@@ -1,57 +1,16 @@
 package node.facebook;
 
-import java.io.IOException;
+
 import java.util.Vector;
 import node.rpc.RPCMethodCall;
-import edu.washington.cs.cse490h.lib.PersistentStorageReader;
-import edu.washington.cs.cse490h.lib.PersistentStorageWriter;
-import edu.washington.cs.cse490h.lib.Utility;
 
 public abstract class BaseFacebookSystem {
-	private static final String FILE_NAME = "facebookdb.txt";
 
-	protected boolean m_inRecovery = false;
+
 	protected FacebookRPCNode m_node;
 	
 	public BaseFacebookSystem(FacebookRPCNode node) {
 		this.m_node = node;
-	}
-	
-	public void recoverFromCrash() {
-		try {
-			m_inRecovery = true;
-			if (Utility.fileExists(this.m_node, FILE_NAME)) {
-				PersistentStorageReader psr = this.m_node.getReader(FILE_NAME);
-				String line;
-				while ((line = psr.readLine()) != null) {
-					user_info("Recovery: replaying command from log: " + line);
-					RPCMethodCall methodCall = parseRPCMethodCall(line);
-					// TODO: fix recovery
-					//callLocalMethod(methodCall.getMethodName(), methodCall.getParams());
-				}
-				psr.close();				
-			}
-		} catch (Exception e) {
-			e.printStackTrace();
-		} finally {
-			m_inRecovery = false;
-		}
-	}
-	
-	//TODO: if you fix the TODOs below, do it for TwoPhaseCommitNode.saveContext too.
-	protected void appendToLog(String content) {
-		// Don't append to the log if in recovery mode
-		if (!m_inRecovery) {
-			try {
-				// TODO: use IStorageServer instead?
-				PersistentStorageWriter psw = m_node.getWriter(FILE_NAME, true);
-				psw.write(content);
-				psw.close();
-			} catch (IOException e) {
-				// TODO: return the proper error
-				e.printStackTrace();
-			}
-		}
 	}
 
 	protected void user_info(String s) {
