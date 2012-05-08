@@ -106,7 +106,8 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 	
 	public String acceptFriendAdder(String token, String adderLogin) throws FacebookException {
 		// TODO: either remove session tokens, or auto-add session token to 'receiverLogin'
-		String receiverLogin = extractUserLogin(token);
+		String receiverLogin = token;
+		
 		if (!this.m_state.containsUser(receiverLogin)) {
 			throw new FacebookException(FacebookException.SESSION_DONT_EXIST);
 		}
