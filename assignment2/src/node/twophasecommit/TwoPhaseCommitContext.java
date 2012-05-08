@@ -116,6 +116,12 @@ public class TwoPhaseCommitContext
 		Gson gson = new Gson();
 		return gson.toJson(this);
 	}
+	
+	public static TwoPhaseCommitContext deserialize(String json)
+	{
+		Gson gson = new Gson();
+		return gson.fromJson(json, TwoPhaseCommitContext.class);
+	}
 
 	public int getTimeout() {
 		// TODO-licavalc: calculate the right timeout based on the number of participants, unless we implement multicast or non-blocing rpc calls

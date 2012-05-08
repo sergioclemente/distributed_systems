@@ -175,6 +175,11 @@ public abstract class Node {
 		}
 	}
 
+	public String[] listFiles()
+	{
+		return Utility.listFiles(this);
+	}
+	
 	/**
 	 * Gets a PersistentStorageReader object for the filename specified.
 	 * 

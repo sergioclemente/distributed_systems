@@ -38,6 +38,7 @@ public abstract class BaseFacebookSystem {
 		}
 	}
 	
+	//TODO: if you fix the TODOs below, do it for TwoPhaseCommitNode.saveContext too.
 	protected void appendToLog(String content) {
 		// Don't append to the log if in recovery mode
 		if (!m_inRecovery) {

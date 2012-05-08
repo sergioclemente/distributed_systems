@@ -1,5 +1,7 @@
 package node.twophasecommit;
 
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.Dictionary;
 import java.util.Enumeration;
@@ -8,6 +10,8 @@ import java.util.UUID;
 import java.util.Vector;
 
 import edu.washington.cs.cse490h.lib.Callback;
+import edu.washington.cs.cse490h.lib.PersistentStorageReader;
+import edu.washington.cs.cse490h.lib.PersistentStorageWriter;
 
 import node.rpc.I2pcCoordinator;
 import node.rpc.I2pcCoordinatorReply;
@@ -24,6 +28,7 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 	private Hashtable<Integer, I2pcParticipant> m_stubs = new Hashtable<Integer, I2pcParticipant>();
 	private Method m_waitForVotesTimeoutMethod;
 	private Method m_waitForDecisionTimeoutMethod;
+	protected boolean m_inRecovery = false;
 	
 	/**
 	 * We need to keep the history of two phase commit for the case of a node waking up and asking us for data about
@@ -452,19 +457,51 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 		return false;
 	}
 	
-	//TODO-licavalc: Need to do the right thing with write/read from log. Right now, we append an updated version of the whole json version of the object in the log.
-	//TODO-licavalc: How to store the state of the participant? Just store the participant JSON, use the TwoPhaseCommitContext for participants as well?	
-	private void saveContext(TwoPhaseCommitContext context) {
-		//TODO-luciano: updateFileContents() doesn't exist as part of RPCNode anymore. Commenting out for now.
-		/*
-		try {			
-			String logMessage =	String.format("start-2pc %s", context.toJson());
-			
-			updateFileContents("TwoPhaseCommit.txt", logMessage, true);
-		} catch (IOException e) {
-			e.printStackTrace();
+	private void recover()
+	{
+		recoverContexts();
+		
+		//TODO-licavalc: we should have at most one pending 2pc going on, for that, we need to recover accordingly
+	}
+	
+	private void recoverContexts()
+	{
+		String[] files = m_node.listFiles();
+		
+		for (int i = 0; i < files.length; i++) {
+			if (files[i].startsWith("2pc-"))
+			{
+				try {
+					PersistentStorageReader psr = m_node.getReader(files[i]);
+					
+					String line;
+					StringBuffer buffer = new StringBuffer();
+					while ((line = psr.readLine()) != null) {
+						buffer.append(line);
+					}
+					
+					TwoPhaseCommitContext context = TwoPhaseCommitContext.deserialize(buffer.toString());
+					_twoPhaseCommitContexts.put(context.getId(), context);
+				} catch (FileNotFoundException e) {
+					e.printStackTrace();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
 		}
-		*/
+	}
+			
+	private void saveContext(TwoPhaseCommitContext context) {		
+		// Don't append to the log if in recovery mode
+		if (!m_inRecovery) {
+			try {
+				PersistentStorageWriter psw = m_node.getWriter("2pc-" + context.getId(), false);
+				psw.write(context.serialize());
+				psw.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
 	}
 	
 	
