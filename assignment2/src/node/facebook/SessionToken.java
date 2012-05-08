@@ -1,15 +1,14 @@
 package node.facebook;
 
 public class SessionToken {
+	private String user;
+	private String seed;
 	
 	public SessionToken(String user, String seed) {
 		super();
-		this.m_user = user;
-		this.m_seed = seed;
+		this.user = user;
+		this.seed = seed;
 	}
-
-	private String m_user;
-	private String m_seed;
 	
 	public static SessionToken createFromString(String token) {
 		String[] parts = token.split(";");
@@ -19,22 +18,22 @@ public class SessionToken {
 
 	@Override
 	public String toString() {
-		return m_user + ";" + m_seed;
+		return user + ";" + seed;
 	}
 	
 	public String getUser() {
-		return m_user;
+		return user;
 	}
 
 	public void setUser(String user) {
-		this.m_user = user;
+		this.user = user;
 	}
 
 	public String getToken() {
-		return m_seed;
+		return seed;
 	}
 
 	public void setToken(String token) {
-		this.m_seed = token;
+		this.seed = token;
 	}
 }

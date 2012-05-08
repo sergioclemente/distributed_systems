@@ -4,26 +4,26 @@ public class Message {
 	
 	public Message(String fromLogin, String message) {
 		super();
-		this.m_fromLogin = fromLogin;
-		this.m_message = message;
+		this.fromLogin = fromLogin;
+		this.message = message;
 	}
 	
 	public String getFromLogin() {
-		return m_fromLogin;
+		return fromLogin;
 	}
 	
 	public void setFromLogin(String fromLogin) {
-		this.m_fromLogin = fromLogin;
+		this.fromLogin = fromLogin;
 	}
 	
 	public String getMessage() {
-		return m_message;
+		return message;
 	}
 	
 	public void setMessage(String message) {
-		this.m_message = message;
+		this.message = message;
 	}
 	
-	private String m_fromLogin;
-	private String m_message;
+	private String fromLogin;
+	private String message;
 }
