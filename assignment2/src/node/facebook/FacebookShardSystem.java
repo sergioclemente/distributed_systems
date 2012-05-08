@@ -16,14 +16,24 @@ import edu.washington.cs.cse490h.lib.PersistentStorageWriter;
 public class FacebookShardSystem extends BaseFacebookSystem implements IFacebookServer {
 
 	private FacebookShardState m_state = new FacebookShardState();
+	private FacebookShardState m_uncommitedState = null;
 	
 	private static final String FILE_NAME = "facebookstate.txt";
+	private static final String FILE_NAME_TEMP = "facebookstate_temp.txt";
 	
 	private void saveState() {
+		this.saveStateInFile(this.m_state, FILE_NAME);
+	}
+	
+	private void saveUncommitedState() {
+		this.saveStateInFile(this.m_uncommitedState, FILE_NAME_TEMP);
+	}
+	
+	private void saveStateInFile(FacebookShardState state, String file) {
 		try {
-			String content = FacebookShardState.serialize(m_state);
+			String content = FacebookShardState.serialize(state);
 			
-			PersistentStorageWriter psw = m_node.getWriter(FILE_NAME, false);
+			PersistentStorageWriter psw = m_node.getWriter(file, false);
 			psw.write(content);
 			psw.close();
 		} catch (IOException e) {
@@ -32,9 +42,14 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 	}
 	
 	public void recoverFromCrash() {
+		this.m_state = restoreState(FILE_NAME);
+		this.m_uncommitedState = restoreState(FILE_NAME_TEMP);
+	}
+	
+	private FacebookShardState restoreState(String filename) {
 		try {
-			if (Utility.fileExists(m_node, FILE_NAME)) {
-				PersistentStorageReader psr = m_node.getReader(FILE_NAME);
+			if (Utility.fileExists(m_node, filename)) {
+				PersistentStorageReader psr = m_node.getReader(filename);
 				char[] buffer = new char[1024];
 				StringBuffer sb = new StringBuffer();
 				do {
@@ -46,11 +61,13 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 					}
 				} while (true);
 				
-				this.m_state = FacebookShardState.deserialize(sb.toString());
+				return FacebookShardState.deserialize(sb.toString());
 			}
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+		
+		return null;
 	}
 	
 	/**
@@ -141,7 +158,7 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 		requestList.remove(adderLogin);
 		this.m_state.addFriendToList(receiverLogin, adderLogin);
 		
-//		this.saveState();
+		this.saveState();
 		this.user_info("(Receiver) User: " + receiverLogin + " accepted to be friends of user " + adderLogin);
 		
 		return null;
@@ -189,17 +206,45 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 		
 		Message m = new Message(from, message);
 		
+		if (this.m_uncommitedState != null) {
+			throw new FacebookException(FacebookException.CANNOT_HAVE_WRITE_WITH_UNCOMMITED_WRITE);
+		}
+		
+		this.m_uncommitedState = this.m_state.clone();
+		
 		for (String login: logins) {
 			// Just add the message if the users are friends
-			if (this.m_state.isFriendOf(login, from)) {
-				this.m_state.addMessage(login, m);
+			if (this.m_uncommitedState.isFriendOf(login, from)) {
+				this.m_uncommitedState.addMessage(login, m);
 			}
 		}
 
-		this.saveState();
+		this.saveUncommitedState();
 		
 		// Nothing to return
 		return null;
+	}
+	
+	public void writeMessageAllCommit() {
+		this.m_state = this.m_uncommitedState;
+		this.m_uncommitedState = null;
+		deleteTempFile();
+	}
+	
+	public void writeMessageAllAbort() {
+		this.m_uncommitedState = null;
+		deleteTempFile();
+	}
+	
+	private void deleteTempFile() {
+		try {
+			if (Utility.fileExists(this.m_node, FILE_NAME_TEMP)) {
+				PersistentStorageWriter f = m_node.getWriter(FILE_NAME_TEMP, false);
+				f.delete();
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
 	
 	/**

@@ -105,4 +105,11 @@ public class FacebookShardState {
 		Gson g = new Gson();
 		return g.fromJson(str, FacebookShardState.class);
 	}
+	
+	// Clone
+	public FacebookShardState clone() {
+		// Dumb way to implement the clone, but lets get things done then optimize later
+		String content = this.serialize(this);
+		return deserialize(content);
+	}
 }
