@@ -13,10 +13,6 @@ public class TwoPhaseCommitContext
 	
 	private Vector<Participant> _participants;
 	
-	private String _command;
-	
-	private Vector<String> _params;
-	
 	private Decision _decision;
 	
 	/**
@@ -24,11 +20,9 @@ public class TwoPhaseCommitContext
 	 */
 	private boolean _finished;
 	
-	public TwoPhaseCommitContext(UUID id, int coordinator, Vector<String> participants, String command, Vector<String> params)
+	public TwoPhaseCommitContext(UUID id, int coordinator, Vector<String> participants)
 	{
 		_id = id;
-		_command = command;
-		_params = params;
 		_coordinator = coordinator;
 		_decision = Decision.NotDecided;
 		
@@ -38,9 +32,9 @@ public class TwoPhaseCommitContext
 		}	
 	}
 	
-	public TwoPhaseCommitContext(int coordinator, Vector<String> participants, String command, Vector<String> params)
+	public TwoPhaseCommitContext(int coordinator, Vector<String> participants)
 	{
-		this(UUID.randomUUID(), coordinator, participants, command, params);
+		this(UUID.randomUUID(), coordinator, participants);
 	}
 	
 	public UUID getId() {
@@ -80,14 +74,6 @@ public class TwoPhaseCommitContext
 		
 		return null;
 	}	
-	
-	public String getCommand() {
-		return _command;
-	}
-	
-	public Vector<String> getParams() {
-		return _params;
-	}
 	
 	public Decision getDecision() {
 		return _decision;

@@ -245,22 +245,10 @@ public class RPCNode extends ReliableDeliveryNode
 	 * Called by 2pc
 	 * 
 	 * TODO-sergio: add this at facebook node
-	 * 
-	 * @return Based on this result the node will vote Yes (true) or No (false).
 	 */
-	public boolean pendingCommandSucceeded()
+	public boolean saveToDisk()
 	{
 		return false;
-	}
-	
-	/**
-	 * Called by 2pc
-	 * 
-	 * TODO-sergio: add this at facebook node
-	 */
-	public void saveToDisk()
-	{
-		
 	}
 		
 	/**
