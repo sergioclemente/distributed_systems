@@ -221,6 +221,47 @@ public class RPCNode extends ReliableDeliveryNode
 	{
 	}
 	
+	/**
+	 * Called by 2pc
+	 * 
+	 * TODO-sergio: add this at facebook node
+	 */
+	public void abort()
+	{
+		
+	}
+	
+	/**
+	 * Called by 2pc
+	 * 
+	 * TODO-sergio: add this at facebook node
+	 */
+	public void commit()
+	{
+		
+	}
+	
+	/**
+	 * Called by 2pc
+	 * 
+	 * TODO-sergio: add this at facebook node
+	 * 
+	 * @return Based on this result the node will vote Yes (true) or No (false).
+	 */
+	public boolean pendingCommandSucceeded()
+	{
+		return false;
+	}
+	
+	/**
+	 * Called by 2pc
+	 * 
+	 * TODO-sergio: add this at facebook node
+	 */
+	public void saveToDisk()
+	{
+		
+	}
 		
 	/**
 	 * bindRpcMethod()	

@@ -8,6 +8,11 @@ public class Participant
 	
 	private Decision _decision;
 	
+	/**
+	 * Tells if the 2pc has decided and run, should only be set after either abort or commit runs successfully.
+	 */
+	private boolean _finished;
+	
 	public Participant(String participant)
 	{
 		_participant = Integer.parseInt(participant);
@@ -33,5 +38,15 @@ public class Participant
 	
 	public void setDecision(Decision _decision) {
 		this._decision = _decision;
+	}
+	
+	public boolean getFinished()
+	{
+		return _finished;
+	}
+	
+	public void setFinished(boolean finished)
+	{
+		_finished = finished;
 	}
 }

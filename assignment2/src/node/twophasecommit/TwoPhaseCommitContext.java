@@ -19,6 +19,11 @@ public class TwoPhaseCommitContext
 	
 	private Decision _decision;
 	
+	/**
+	 * Tells if the 2pc has decided and run, should only be set after all the abort or commit messages have been sent.
+	 */
+	private boolean _finished;
+	
 	public TwoPhaseCommitContext(UUID id, int coordinator, Vector<String> participants, String command, Vector<String> params)
 	{
 		_id = id;
@@ -90,6 +95,16 @@ public class TwoPhaseCommitContext
 	
 	public void setDecision(Decision _decision) {
 		this._decision = _decision;
+	}
+	
+	public boolean getFinished()
+	{
+		return _finished;
+	}
+	
+	public void setFinished(boolean finished)
+	{
+		_finished = finished;
 	}
 	
 	public Decision getDecisionBasedOnVotes()

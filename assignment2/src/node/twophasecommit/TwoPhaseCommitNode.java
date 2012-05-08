@@ -45,8 +45,9 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 	{
 		m_node = node;
 		
-		//TODO-licavalc: load state from log file
 		_twoPhaseCommitContexts = new Hashtable<UUID, TwoPhaseCommitContext>();
+		
+		recover();
 		
 		try {
 			this.m_waitForVotesTimeoutMethod = Callback.getMethod("onWaitForVotesTimeout", this, new String[] { "java.util.UUID" });
@@ -128,6 +129,9 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 		for (Participant participant : participantsWhoVotedYes) {
 			beginSendAbort(participant.getId(), context.getId());
 		}
+		
+		context.setFinished(true);
+		saveContext(context);
 	}	
 	
 	public void beginSendAbort(int targetSender, UUID twoPhaseCommitId) {
@@ -159,8 +163,21 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 		context.setDecision(Decision.Abort);
 		saveContext(context);
 		
-		// No need to do anything else, as we didn't really write anything in the write ahead log. We may need to 
-		// change this in the future.
+		abortOrCommit(context, true);
+	}
+
+	private void abortOrCommit(TwoPhaseCommitContext context, boolean abort) {
+		if (abort)
+		{
+			m_node.abort();
+		}
+		else
+		{
+			m_node.commit();
+		}
+		
+		context.getParticipant(m_node.addr).setFinished(true);
+		saveContext(context);
 	}
 
 	private void commitTwoPhaseCommit(UUID twoPhaseCommitContextId) {
@@ -179,6 +196,9 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 		for (Participant participant : participants) {
 			beginSendCommit(participant.getId(), context.getId());
 		}
+		
+		context.setFinished(true);
+		saveContext(context);
 	}
 	
 	public void beginSendCommit(int targetSender, UUID twoPhaseCommitId) {
@@ -210,9 +230,7 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 		context.setDecision(Decision.Commit);
 		saveContext(context);
 		
-		//TODO-luciano: Luciano, you need to call this using your new call mechanism I guess.
-		//TODO-licavalc: we need to call this too when recovering
-		onMethodCalled(from, context.getCommand(), context.getParams());
+		abortOrCommit(context, false);
 	}
 
 	public void beginVoteRequest(int targetSender, UUID twoPhaseCommitId, Vector<String> participants, String command, 
@@ -228,7 +246,7 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 		params.add(command);
 		params.addAll(commandParams);
 		
-		//TODO-licavalc: need to put each of these calls in a separate queue per participant or make this a broadcast
+		//TODO-licavalc: need to put each of these calls in a separate queue per participant or make this a multicast
 		callMethod(targetSender, "vote-request", params);
 	}
 	
@@ -257,17 +275,19 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 				new TwoPhaseCommitContext(twoPhaseCommitContextId, from ,participants, command, commandParams);
 		_twoPhaseCommitContexts.put(newContext.getId(), newContext);
 		
-		if (anyTwoPhaseCommitPending(newContext))
+		m_node.saveToDisk();
+		
+		if (anyTwoPhaseCommitPending(newContext) || !m_node.pendingCommandSucceeded())
 		{
 			newContext.getParticipant(m_node.addr).setVote(Vote.No);
 			newContext.setDecision(Decision.Abort);
 			saveContext(newContext);
 			
+			abortOrCommit(newContext, true);
+			
 			beginSendVote(from, twoPhaseCommitContextId, Vote.No);
 			return;
-		}
-		
-		//TODO-licavalc: DON'T REALLY NEED THIS NOW: run the command at this point, but don't commit it. Needed to properly figure out the Vote.
+		}		
 		
 		newContext.getParticipant(m_node.addr).setVote(Vote.Yes);
 		saveContext(newContext);
@@ -457,11 +477,73 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 		return false;
 	}
 	
+	private TwoPhaseCommitContext getPendingTwoPhaseCommit()
+	{
+		Enumeration<TwoPhaseCommitContext> twoPhaseCommitContexts = _twoPhaseCommitContexts.elements();
+		while(twoPhaseCommitContexts.hasMoreElements())
+		{
+			TwoPhaseCommitContext twoPhaseCommitContext = twoPhaseCommitContexts.nextElement();
+			
+			if (twoPhaseCommitContext.getDecision() == Decision.NotDecided)
+			{				
+				return twoPhaseCommitContext;
+			}
+		}
+		
+		return null;
+	}
+	
 	private void recover()
 	{
 		recoverContexts();
 		
-		//TODO-licavalc: we should have at most one pending 2pc going on, for that, we need to recover accordingly
+		TwoPhaseCommitContext context = getPendingTwoPhaseCommit();
+		if (context == null)
+		{
+			// no pending 2pc transaction, nothing to do here
+			return;
+		}
+		
+		// Means this node is a participant
+		if (context.getCoordinatorId() != m_node.addr)
+		{
+			Participant participant = context.getParticipant(m_node.addr);
+			if (context.getDecision() == Decision.Commit && !participant.getFinished())
+			{
+				abortOrCommit(context, false);
+			}
+			else if (context.getDecision() == Decision.Abort && !participant.getFinished())
+			{
+				abortOrCommit(context, true);
+			}
+			else
+			{
+				Vote vote = context.getParticipant(m_node.addr).getVote();
+				if (vote == Vote.No || vote == Vote.None)
+				{
+					context.getParticipant(m_node.addr).setVote(Vote.No);
+					context.getParticipant(m_node.addr).setDecision(Decision.Abort);
+					saveContext(context);
+					
+					abortOrCommit(context, true);
+				}
+				else
+				{
+					startTerminationProtocol(context.getId());
+				}
+			}
+		}
+		// its coordinator
+		else
+		{
+			if (context.getDecision() == Decision.NotDecided || (context.getDecision() == Decision.Abort && !context.getFinished()))
+			{
+				abortTwoPhaseCommit(context.getId());
+			}
+			else {
+				commitTwoPhaseCommit(context.getId());
+			}
+		}
 	}
 	
 	private void recoverContexts()
