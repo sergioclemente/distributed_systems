@@ -124,7 +124,7 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 		context.setDecision(Decision.Abort);
 		saveContext(context);
 		
-		Vector<Participant> participantsWhoVotedYes = context.GetAllParticipantsWhoVotedYes();	
+		Vector<Participant> participantsWhoVotedYes = context.getAllParticipantsWhoVotedYes();	
 		for (Participant participant : participantsWhoVotedYes) {
 			beginSendAbort(participant.getId(), context.getId());
 		}

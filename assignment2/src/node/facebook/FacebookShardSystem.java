@@ -142,13 +142,8 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 
 	private String createNewSessionSeed()
 	{
-		// TODO: temporary just to make debugging easier
-		return "123";
-//		StringBuffer sb = new StringBuffer();
-//		for (int i = 0 ; i < 10 ; i++) {
-//			sb.append(Character.toChars('0' + Utility.getRNG().nextInt(10)));
-//		}
-//		return sb.toString();
+		// Let's return a fixed value to make our live easier 
+		return "1234";
 	}
 
 	private String extractUserLogin(String token) throws FacebookException

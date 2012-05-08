@@ -50,7 +50,7 @@ public class TwoPhaseCommitContext
 		return _participants;
 	}
 	
-	public Vector<Participant> GetAllParticipantsWhoVotedYes()
+	public Vector<Participant> getAllParticipantsWhoVotedYes()
 	{
 		Vector<Participant> participantsWhoVotedYes = new Vector<Participant>();
 		
