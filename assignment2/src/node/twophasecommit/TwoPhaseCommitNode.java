@@ -89,9 +89,9 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 	 * @param command - The command to be executed.
 	 * @param params - Any params to the command above.
 	 */
-	public void startTwoPhaseCommit(Vector<String> participants, String command, Vector<String> params)
+	public void startTwoPhaseCommit(Vector<String> participants)
 	{
-		TwoPhaseCommitContext newContext = new TwoPhaseCommitContext(m_node.addr, participants, command, params);
+		TwoPhaseCommitContext newContext = new TwoPhaseCommitContext(m_node.addr, participants);
 		_twoPhaseCommitContexts.put(newContext.getId(), newContext);
 		
 		if (anyTwoPhaseCommitPending(newContext))
@@ -106,7 +106,7 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 		m_node.addTimeout(cb, newContext.getTimeout());
 		
 		for (String participant : participants) {
-			beginVoteRequest(Integer.parseInt(participant), newContext.getId(), participants, command, params);
+			beginVoteRequest(Integer.parseInt(participant), newContext.getId(), participants);
 		}
 				
 		saveContext(newContext);
@@ -233,8 +233,7 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 		abortOrCommit(context, false);
 	}
 
-	public void beginVoteRequest(int targetSender, UUID twoPhaseCommitId, Vector<String> participants, String command, 
-								 Vector<String> commandParams)
+	public void beginVoteRequest(int targetSender, UUID twoPhaseCommitId, Vector<String> participants)
 	{
 		Vector<String> params = new Vector<String>();		
 		
@@ -242,9 +241,6 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 		
 		params.add(participants.size() + "");
 		params.addAll(participants);
-		
-		params.add(command);
-		params.addAll(commandParams);
 		
 		//TODO-licavalc: need to put each of these calls in a separate queue per participant or make this a multicast
 		callMethod(targetSender, "vote-request", params);
@@ -264,20 +260,13 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 		int participantsSize = Integer.valueOf(params.get(1));
 		Vector<String> participants = new Vector<String>(params.subList(2, participantsSize + 2));		
 		
-		String command = params.get(participantsSize + 2);
-		Vector<String> commandParams = new Vector<String>();
-		if (params.size() > participantsSize + 3)
-		{
-			commandParams.addAll(params.subList(participantsSize + 2, params.size()));
-		}
-		
 		TwoPhaseCommitContext newContext = 
-				new TwoPhaseCommitContext(twoPhaseCommitContextId, from ,participants, command, commandParams);
+				new TwoPhaseCommitContext(twoPhaseCommitContextId, from ,participants);
 		_twoPhaseCommitContexts.put(newContext.getId(), newContext);
 		
-		m_node.saveToDisk();
+		boolean saved = m_node.saveToDisk();
 		
-		if (anyTwoPhaseCommitPending(newContext) || !m_node.pendingCommandSucceeded())
+		if (anyTwoPhaseCommitPending(newContext) || !saved)
 		{
 			newContext.getParticipant(m_node.addr).setVote(Vote.No);
 			newContext.setDecision(Decision.Abort);
