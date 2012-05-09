@@ -3,6 +3,8 @@ package node.twophasecommit;
 import java.util.UUID;
 import java.util.Vector;
 
+import settings.MessagingSettings;
+
 import com.google.gson.Gson;
 
 public class TwoPhaseCommitContext
@@ -139,8 +141,7 @@ public class TwoPhaseCommitContext
 	}
 
 	public int getTimeout() {
-		// TODO-licavalc: calculate the right timeout based on the number of participants, unless we implement multicast or non-blocing rpc calls
-		return 0;
+		return _participants.size() * MessagingSettings.MaxTimeout;
 	}
 }
 
