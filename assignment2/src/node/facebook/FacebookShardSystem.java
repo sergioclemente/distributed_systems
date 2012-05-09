@@ -8,7 +8,6 @@ import java.util.Set;
 import java.util.Vector;
 import edu.washington.cs.cse490h.lib.Utility;
 import node.rpc.IFacebookServer;
-import node.rpc.RPCMethodCall;
 import edu.washington.cs.cse490h.lib.PersistentStorageReader;
 import edu.washington.cs.cse490h.lib.PersistentStorageWriter;
 
@@ -42,7 +41,8 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 	}
 	
 	public void recoverFromCrash() {
-		this.m_state = restoreState(FILE_NAME);
+		// TODO-sergio: fix restoreState() to NOT return null when there is no state to recover
+		//this.m_state = restoreState(FILE_NAME);
 		this.m_uncommitedState = restoreState(FILE_NAME_TEMP);
 	}
 	
@@ -200,14 +200,14 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 	/**
 	 * API: IFacebookServer.writeMessageAll
 	 */
-	public String writeMessageAll(String from, String message) throws FacebookException {
+	public String writeMessageAll(String from, String transactionId, String message) throws FacebookException {
 		
 		Set<String> logins = this.m_state.getUserLogins();
 		
 		Message m = new Message(from, message);
 		
 		if (this.m_uncommitedState != null) {
-			throw new FacebookException(FacebookException.CANNOT_HAVE_WRITE_WITH_UNCOMMITED_WRITE);
+			throw new FacebookException(FacebookException.CONCURRENT_TRANSACTIONS_NOT_ALLOWED, transactionId);
 		}
 		
 		this.m_uncommitedState = this.m_state.clone();
@@ -221,8 +221,7 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 
 		this.saveUncommitedState();
 		
-		// Nothing to return
-		return null;
+		return transactionId;
 	}
 	
 	public void writeMessageAllCommit() {

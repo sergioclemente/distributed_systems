@@ -13,9 +13,9 @@ public class Participant
 	 */
 	private boolean _finished;
 	
-	public Participant(String participant)
+	public Participant(int participantId)
 	{
-		_participant = Integer.parseInt(participant);
+		_participant = participantId;
 		_vote = Vote.None;
 		_decision = Decision.NotDecided;
 	}

@@ -46,9 +46,9 @@ public class Stub_FacebookServer extends RPCStub implements IFacebookServer
 		return null;
 	}
 	
-	public String writeMessageAll(String from, String message)
+	public String writeMessageAll(String from, String transactionId, String message)
 	{
-		super.invoke("write_message_all", from, message);
+		super.invoke("write_message_all", from, transactionId, message);
 		return null;
 	}
 	

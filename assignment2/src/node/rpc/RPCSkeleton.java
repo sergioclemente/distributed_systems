@@ -23,6 +23,7 @@ public abstract class RPCSkeleton
 		catch (FacebookException fbex)
 		{
 			result.error = fbex.getExceptionCode();
+			result.content = fbex.getReplyMessage();
 		}
 		catch (Exception ex)
 		{

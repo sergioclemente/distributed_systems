@@ -1,6 +1,7 @@
 package node.facebook;
 import java.util.Hashtable;
 import java.util.Vector;
+import java.util.UUID;
 import node.rpc.IFacebookServer;
 import node.rpc.IFacebookServerReply;
 import node.rpc.RPCException;
@@ -22,6 +23,8 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 	
 	private Hashtable<Integer, IFacebookServer> m_stubs = new Hashtable<Integer, IFacebookServer>();
 	private Hashtable<Integer, PendingAcceptFriendInfo> m_pendingAcceptFriend = new Hashtable<Integer, PendingAcceptFriendInfo>();
+	private UUID m_activeTxn;
+	private int m_shardCount;
 	
 	/**
 	 * FacebookFrontendSystem()
@@ -30,6 +33,7 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 	public FacebookFrontendSystem(FacebookRPCNode node) 
 	{
 		super(node);
+		m_activeTxn = null;
 	}
 
 	/**
@@ -102,6 +106,7 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 					shardReceiver.addFriendReceiver(adderLogin, receiverLogin);
 					break;
 				}
+				
 				case "accept_friend":
 				{
 					String receiverLogin = login;
@@ -121,18 +126,33 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 					m_pendingAcceptFriend.put(RPCStub.getCurrentReplyId(), info);
 					break;
 				}
+				
 				case "write_message_all":
+				{
 					// TODO: write_message_all should only contact shards that actually
 					// contain friends of the user.
-				
-					String message = getMessageBody(command);
-	
-					for (int shardId : FacebookRPCNode.getShardAddresses()) {
-						// TODO: add 2pc here
-						IFacebookServer shard = getShardFromShardAddress(shardId);
-						shard.writeMessageAll(login, message);
+					if (m_activeTxn == null) {
+						// Start a new distributed transaction for this call
+						m_activeTxn = m_node.get2PC().startTransaction();
+						m_shardCount = 0;
+						
+						String message = getMessageBody(command);
+		
+						for (int shardId : FacebookRPCNode.getShardAddresses()) {
+							// TODO: add 2pc here
+							IFacebookServer shard = getShardFromShardAddress(shardId);
+							shard.writeMessageAll(login, m_activeTxn.toString(), message);
+							
+							// Register this shard as a participant
+							m_node.get2PC().addParticipant(m_activeTxn, shardId);
+							m_shardCount++;
+						}
+					} else {
+						m_node.error("There already is an active write_message_all transaction: " + m_activeTxn.toString());
 					}
 					break;
+				}
+				
 				case "read_message_all":
 				{
 					IFacebookServer shard = getShardFromLogin(login);
@@ -146,8 +166,10 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 		}
 		catch (RPCException ex)
 		{
-			// Stubs shouldn't throw, but java forces the try/catch block
+			// Stubs won't throw, but java forces the try/catch block
 			// because remote implementations can throw.
+			// 2PC may throw in case of a bug (repeated participant).
+			ex.printStackTrace();
 		}
 	}
 
@@ -313,15 +335,42 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 	@Override
 	public void reply_writeMessageAll(int replyId, int sender, int result, String reply)
 	{
+		UUID txnid = UUID.fromString(reply);
+		
 		if (result == 0)
 		{
 			// RPC call succeeded
-			user_info("write_message_all: Server returned ok. returnValue=" + reply);
+			user_info(String.format("write_message_all: Shard %d returned ok. returnValue=%s", sender, reply));
+
+			if (txnid.compareTo(m_activeTxn) == 0)
+			{
+				m_shardCount--;
+				if (m_shardCount == 0)
+				{
+					// We've received a success reply from all participant shards.
+					// Time to start the 2PC protocol.
+					m_node.get2PC().startTwoPhaseCommit(m_activeTxn);
+				}
+			}
+			else
+			{
+				user_info(String.format("write_message_all: Ignoring success reply from shard %d regarding transaction %s", sender, reply));
+			}
 		}
 		else
 		{
 			// RPC call failed
 			onMethodFailed(sender, "write_message_all", result);
+			
+			if (txnid.compareTo(m_activeTxn) == 0)
+			{
+				m_node.get2PC().abortTwoPhaseCommit(m_activeTxn);
+				m_activeTxn = null;
+			}
+			else
+			{
+				user_info(String.format("write_message_all: Ignoring failed reply from shard %d regarding transaction %s", sender, reply));
+			}
 		}
 	}
 

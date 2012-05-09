@@ -13,5 +13,5 @@ public interface IFacebookServer
 	String acceptFriendReceiver(String adderLogin, String receiverLogin) throws RPCException;
 	
 	String readMessageAll(String token) throws RPCException;
-	String writeMessageAll(String from, String message) throws RPCException;
+	String writeMessageAll(String from, String transactionId, String message) throws RPCException;
 }

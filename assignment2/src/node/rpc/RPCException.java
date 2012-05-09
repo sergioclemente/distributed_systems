@@ -8,17 +8,18 @@ public class RPCException extends Exception {
 	
 	private int m_exceptionClass;
 	private int m_exceptionCode;
+	private String m_replyMessage;
 	
-	public RPCException(int exceptionCode)
+	public RPCException(int exceptionCode, String replyMessage)
 	{
-		m_exceptionClass = ERROR_CLASS_CLIENT;
-		m_exceptionCode = exceptionCode;
+		this(ERROR_CLASS_CLIENT, exceptionCode, replyMessage);
 	}
 	
-	public RPCException(int exceptionClass, int exceptionCode)
+	public RPCException(int exceptionClass, int exceptionCode, String replyMessage)
 	{
 		m_exceptionClass = exceptionClass;
 		m_exceptionCode = exceptionCode;
+		m_replyMessage = replyMessage;
 	}
 	
 	public int getExceptionClass()
@@ -29,6 +30,11 @@ public class RPCException extends Exception {
 	public int getExceptionCode()
 	{
 		return m_exceptionCode;
+	}
+
+	public String getReplyMessage()
+	{
+		return m_replyMessage;
 	}
 	
 	public static int packErrorCode(int errorClass, int errorValue)
@@ -45,4 +51,5 @@ public class RPCException extends Exception {
 	{
 		return (errorCode) & 0xffff;
 	}
+	
 }

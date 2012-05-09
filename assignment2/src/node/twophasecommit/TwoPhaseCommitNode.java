@@ -19,6 +19,7 @@ import node.rpc.I2pcParticipant;
 import node.rpc.I2pcParticipantReply;
 import node.rpc.RPCException;
 import node.rpc.RPCNode;
+import node.facebook.FacebookException;
 
 
 // TODO: this is not a node anymore, rename to something else. ThoPhaseCommitCoordinator?
@@ -81,6 +82,20 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 	}
 
 	
+	public UUID startTransaction()
+	{
+		TwoPhaseCommitContext newContext = new TwoPhaseCommitContext(m_node.addr);
+		_twoPhaseCommitContexts.put(newContext.getId(), newContext);
+		return newContext.getId();
+	}
+
+	public void addParticipant(UUID transactionId, int participantId) throws FacebookException
+	{
+		TwoPhaseCommitContext context;
+		context = _twoPhaseCommitContexts.get(transactionId);
+		context.addParticipant(participantId);
+	}
+	
 	/**
 	 * Starts a new two phase commit process. It tries to execute the passed command on the passed list of 
 	 * participants.
@@ -89,27 +104,33 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 	 * @param command - The command to be executed.
 	 * @param params - Any params to the command above.
 	 */
-	public void startTwoPhaseCommit(Vector<String> participants)
+	public void startTwoPhaseCommit(UUID transactionId)
 	{
-		TwoPhaseCommitContext newContext = new TwoPhaseCommitContext(m_node.addr, participants);
-		_twoPhaseCommitContexts.put(newContext.getId(), newContext);
+		TwoPhaseCommitContext context;
+		context = _twoPhaseCommitContexts.get(transactionId);
 		
-		if (anyTwoPhaseCommitPending(newContext))
+		context.setInProgress(true);
+		
+		// TODO: remove - write_message_all is responsible for blocking concurrent transactions
+		/*
+		if (anyTwoPhaseCommitPending(context))
 		{
 			// LICAVALC: is just the fact that the coordinator decided enough? Do we have to wait for it to notify
 			// participants? I don't think so, right?
-			abortTwoPhaseCommit(newContext.getId());
+			abortTwoPhaseCommit(context.getId());
 			return;
 		}
-
-		Callback cb = new Callback(this.m_waitForVotesTimeoutMethod, this, new Object[] { newContext.getId() });
-		m_node.addTimeout(cb, newContext.getTimeout());
+		*/
 		
-		for (String participant : participants) {
-			beginVoteRequest(Integer.parseInt(participant), newContext.getId(), participants);
+		Callback cb = new Callback(this.m_waitForVotesTimeoutMethod, this, new Object[] { context.getId() });
+		m_node.addTimeout(cb, context.getTimeout());
+		
+		for (Participant participant : context.getParticipants()) {
+			// TODO: why do we need to send the list of participants? 
+			beginVoteRequest(participant.getId(), context.getId(), /*context.getParticipants()*/ new Vector<String>());
 		}
 				
-		saveContext(newContext);
+		saveContext(context);
 	}
 	
 	public void abortTwoPhaseCommit(UUID twoPhaseCommitContextId)
@@ -129,6 +150,7 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 		for (Participant participant : participantsWhoVotedYes) {
 			beginSendAbort(participant.getId(), context.getId());
 		}
+		
 		
 		context.setFinished(true);
 		saveContext(context);
@@ -255,14 +277,20 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 	 */
 	public void receiveVoteRequest(int from, Vector<String> params)
 	{
+		// TODO-livar: handle case where participant receives multiple vote requests
+		
 		UUID twoPhaseCommitContextId = UUID.fromString(params.get(0));
 		
-		int participantsSize = Integer.valueOf(params.get(1));
-		Vector<String> participants = new Vector<String>(params.subList(2, participantsSize + 2));		
-		
-		TwoPhaseCommitContext newContext = 
-				new TwoPhaseCommitContext(twoPhaseCommitContextId, from ,participants);
+		TwoPhaseCommitContext newContext;
+		newContext = new TwoPhaseCommitContext(twoPhaseCommitContextId, from);
 		_twoPhaseCommitContexts.put(newContext.getId(), newContext);
+		
+		try {
+			// Add itself as a participant for book-keeping purposes
+			newContext.addParticipant(m_node.addr);
+		} catch (FacebookException e) {
+			// won't happen - single participant
+		}
 		
 		boolean saved = m_node.saveToDisk();
 		
@@ -450,6 +478,8 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 		// if we already reached a decision, don't have to do anything else.
 	}
 	
+	// TODO: nao precisa desse metodo, o write_message_all de cada node tem que ser capaz de
+	// detectar por si soh se ha outro 2pc rolando.  
 	private boolean anyTwoPhaseCommitPending(TwoPhaseCommitContext newContext) {
 		Enumeration<TwoPhaseCommitContext> twoPhaseCommitContexts = _twoPhaseCommitContexts.elements();
 		while(twoPhaseCommitContexts.hasMoreElements())

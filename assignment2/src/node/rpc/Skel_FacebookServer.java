@@ -48,7 +48,7 @@ public class Skel_FacebookServer extends RPCSkeleton
 			content = m_impl.acceptFriendReceiver(methodArgs.get(0), methodArgs.get(1));
 			break;			
 		case "write_message_all":
-			content = m_impl.writeMessageAll(methodArgs.get(0), methodArgs.get(1));
+			content = m_impl.writeMessageAll(methodArgs.get(0), methodArgs.get(1), methodArgs.get(2));
 			break;
 			
 		case "read_message_all":

@@ -53,6 +53,10 @@ public class FacebookRPCNode extends RPCNode {
 		return s_shardAddresses;
 	}
 
+	public TwoPhaseCommitNode get2PC() {
+		return m_twoPhase;
+	}
+	
 	@Override
 	public void onCommand(String command) {
 		boolean handled = false;
