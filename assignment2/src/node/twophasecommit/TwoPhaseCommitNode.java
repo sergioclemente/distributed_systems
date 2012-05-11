@@ -27,6 +27,7 @@ import node.facebook.FacebookException;
 // TODO: this is not a node anymore, rename to something else. ThoPhaseCommitCoordinator?
 public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2pcCoordinatorReply, I2pcParticipantReply 
 {		
+	private static final String PARTICIPANT_FILENAME = "2pc-participant";
 	private RPCNode m_node;
 	private Hashtable<Integer, I2pcParticipant> m_stubs = new Hashtable<Integer, I2pcParticipant>();
 	private Method m_waitForVotesTimeoutMethod;
@@ -282,10 +283,22 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 		UUID twoPhaseCommitContextId = UUID.fromString(params.get(0));
 		
 		// If this is a request for our current transaction and we have already voted, just re-send the vote.
-		if (_participantContext.getId() == twoPhaseCommitContextId && 
-			_participantContext.getParticipant(m_node.addr).getVote() != Vote.None)
+		if (_participantContext != null && _participantContext.getId() == twoPhaseCommitContextId && 
+			(_participantContext.getParticipant(m_node.addr).getVote() != Vote.None || 
+			 _participantContext.getDecision() != Decision.NotDecided))
 		{
-			beginSendVote(from, twoPhaseCommitContextId, _participantContext.getParticipant(m_node.addr).getVote());
+			if (_participantContext.getDecision() == Decision.Commit)
+			{
+				beginSendVote(from, twoPhaseCommitContextId, Vote.Yes);
+			}
+			else if (_participantContext.getDecision() == Decision.Abort)
+			{
+				beginSendVote(from, twoPhaseCommitContextId, Vote.No);
+			}
+			else
+			{
+				beginSendVote(from, twoPhaseCommitContextId, _participantContext.getParticipant(m_node.addr).getVote());
+			}
 			return;
 		}
 		
@@ -323,19 +336,23 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 	
 	private void startTerminationProtocol(UUID twoPhaseCommitContextId)
 	{
-		TwoPhaseCommitContext context = _twoPhaseCommitContexts.get(twoPhaseCommitContextId);
-		
-		if (context == null)
+		if (_participantContext == null) 
 		{
-			m_node.error("startTerminationProtocol: context not found.");
+			m_node.error("receiveAbort: this node is not participanting in a transaction as a particiapnt.");
 			return;
 		}
 		
-		Callback cb = new Callback(this.m_waitForDecisionTimeoutMethod, this, new Object[] { context.getId() });
+		if (_participantContext.getId() != twoPhaseCommitContextId)
+		{
+			m_node.error("receiveAbort: this node is not participanting in this transaction as a particiapnt.");
+			return;
+		}
+		
+		Callback cb = new Callback(this.m_waitForDecisionTimeoutMethod, this, new Object[] { _participantContext.getId() });
 		m_node.addTimeout(cb, MessagingSettings.MaxTimeout);
 				
 		// Only ask the coordinator
-		beginDecisionRequest(context.getCoordinatorId(), context.getId());
+		beginDecisionRequest(_participantContext.getCoordinatorId(), _participantContext.getId());
 	}
 	
 	private void beginDecisionRequest(int targetSender, UUID twoPhaseCommitId) 
@@ -482,7 +499,7 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 		// if we already reached a decision, don't have to do anything else.
 	}
 	
-	private TwoPhaseCommitContext getPendingTwoPhaseCommit()
+	private TwoPhaseCommitContext getPendingTwoPhaseCommitAsCoordinator()
 	{
 		Enumeration<TwoPhaseCommitContext> twoPhaseCommitContexts = _twoPhaseCommitContexts.elements();
 		while(twoPhaseCommitContexts.hasMoreElements())
@@ -502,51 +519,45 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 	{
 		recoverContexts();
 		
-		TwoPhaseCommitContext context = getPendingTwoPhaseCommit();
-		if (context == null)
+		TwoPhaseCommitContext coordinatorContext = getPendingTwoPhaseCommitAsCoordinator();
+		if (coordinatorContext != null)
 		{
-			// no pending 2pc transaction, nothing to do here
-			return;
+			if (coordinatorContext.getDecision() == Decision.NotDecided || 
+				(coordinatorContext.getDecision() == Decision.Abort && !coordinatorContext.getFinished()))
+			{
+				abortTwoPhaseCommit(coordinatorContext.getId());
+			}
+			else {
+				commitTwoPhaseCommit(coordinatorContext.getId());
+			}
 		}
 		
-		// Means this node is a participant
-		if (context.getCoordinatorId() != m_node.addr)
+		if (_participantContext != null)
 		{
-			Participant participant = context.getParticipant(m_node.addr);
-			if (context.getDecision() == Decision.Commit && !participant.getFinished())
+			Participant participant = _participantContext.getParticipant(m_node.addr);
+			if (_participantContext.getDecision() == Decision.Commit && !participant.getFinished())
 			{
-				abortOrCommit(context, false);
+				abortOrCommit(_participantContext, false);
 			}
-			else if (context.getDecision() == Decision.Abort && !participant.getFinished())
+			else if (_participantContext.getDecision() == Decision.Abort && !participant.getFinished())
 			{
-				abortOrCommit(context, true);
+				abortOrCommit(_participantContext, true);
 			}
 			else
 			{
-				Vote vote = context.getParticipant(m_node.addr).getVote();
+				Vote vote = _participantContext.getParticipant(m_node.addr).getVote();
 				if (vote == Vote.No || vote == Vote.None)
 				{
-					context.getParticipant(m_node.addr).setVote(Vote.No);
-					context.getParticipant(m_node.addr).setDecision(Decision.Abort);
-					saveContext(context);
+					_participantContext.getParticipant(m_node.addr).setVote(Vote.No);
+					_participantContext.getParticipant(m_node.addr).setDecision(Decision.Abort);
+					saveContext(_participantContext);
 					
-					abortOrCommit(context, true);
+					abortOrCommit(_participantContext, true);
 				}
 				else
 				{
-					startTerminationProtocol(context.getId());
+					startTerminationProtocol(_participantContext.getId());
 				}
-			}
-		}
-		// its coordinator
-		else
-		{
-			if (context.getDecision() == Decision.NotDecided || (context.getDecision() == Decision.Abort && !context.getFinished()))
-			{
-				abortTwoPhaseCommit(context.getId());
-			}
-			else {
-				commitTwoPhaseCommit(context.getId());
 			}
 		}
 	}
@@ -568,7 +579,14 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 					}
 					
 					TwoPhaseCommitContext context = TwoPhaseCommitContext.deserialize(buffer.toString());
-					_twoPhaseCommitContexts.put(context.getId(), context);
+					if (files[i].equals(PARTICIPANT_FILENAME))
+					{
+						_participantContext = context;
+					}
+					else
+					{
+						_twoPhaseCommitContexts.put(context.getId(), context);
+					}
 				} catch (FileNotFoundException e) {
 					e.printStackTrace();
 				} catch (IOException e) {
@@ -582,7 +600,7 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 		// Don't append to the log if in recovery mode
 		if (!m_inRecovery) {
 			try {
-				String fileName = context == _participantContext ? "2pc-participant" : "2pc-" + context.getId();
+				String fileName = context == _participantContext ? PARTICIPANT_FILENAME : "2pc-" + context.getId();
 				PersistentStorageWriter psw = m_node.getWriter(fileName, false);
 				psw.write(context.serialize());
 				psw.close();
