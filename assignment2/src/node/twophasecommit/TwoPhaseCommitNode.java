@@ -178,7 +178,7 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 			return;
 		}
 		
-		if (_participantContext.getId() != twoPhaseCommitContextId)
+		if (_participantContext.getId().compareTo(twoPhaseCommitContextId) != 0)
 		{
 			m_node.error("receiveAbort: this node is not participanting in this transaction as a particiapnt.");
 			return;
@@ -193,11 +193,11 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 	private void abortOrCommit(TwoPhaseCommitContext context, boolean abort) {
 		if (abort)
 		{
-			m_node.abort();
+			m_node.abort(context.getId());
 		}
 		else
 		{
-			m_node.commit();
+			m_node.commit(context.getId());
 		}
 		
 		context.getParticipant(m_node.addr).setFinished(true);
@@ -249,7 +249,7 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 			return;
 		}
 		
-		if (_participantContext.getId() != twoPhaseCommitContextId)
+		if (_participantContext.getId().compareTo(twoPhaseCommitContextId) != 0)
 		{
 			m_node.error("receiveCommit: this node is not participanting in this transaction as a particiapnt.");
 			return;
@@ -281,25 +281,28 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 	{		
 		UUID twoPhaseCommitContextId = UUID.fromString(params.get(0));
 		
+		if (_participantContext == null)
+		{
+			_participantContext = new TwoPhaseCommitContext(twoPhaseCommitContextId, from);	
+
+			try {
+				// Add itself as a participant for book-keeping purposes
+				_participantContext.addParticipant(m_node.addr);
+			} catch (FacebookException e) {
+				// won't happen - single participant
+			}
+		}
+		
 		// If this is a request for our current transaction and we have already voted, just re-send the vote.
-		if (_participantContext.getId() == twoPhaseCommitContextId && 
+		if (_participantContext.getId().compareTo(twoPhaseCommitContextId) == 0 &&
+			_participantContext.getParticipant(m_node.addr) != null &&
 			_participantContext.getParticipant(m_node.addr).getVote() != Vote.None)
 		{
 			beginSendVote(from, twoPhaseCommitContextId, _participantContext.getParticipant(m_node.addr).getVote());
 			return;
 		}
 		
-		_participantContext = new TwoPhaseCommitContext(twoPhaseCommitContextId, from);
-		
-		try {
-			// Add itself as a participant for book-keeping purposes
-			_participantContext.addParticipant(m_node.addr);
-		} catch (FacebookException e) {
-			// won't happen - single participant
-		}
-		
-		boolean saved = m_node.saveToDisk();
-		
+		boolean saved = m_node.prepare(twoPhaseCommitContextId);
 		if (!saved)
 		{
 			_participantContext.getParticipant(m_node.addr).setVote(Vote.No);
@@ -467,7 +470,7 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 			return;
 		}
 		
-		if (_participantContext.getId() != twoPhaseCommitContextId)
+		if (_participantContext.getId().compareTo(twoPhaseCommitContextId) != 0)
 		{
 			m_node.error("onWaitForDecisionTimeout: this node is not participanting in this transaction as a particiapnt.");
 			return;

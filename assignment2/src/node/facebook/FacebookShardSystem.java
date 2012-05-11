@@ -5,6 +5,7 @@ import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.Vector;
 import edu.washington.cs.cse490h.lib.Utility;
 import node.rpc.IFacebookServer;
@@ -16,28 +17,33 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 
 	private FacebookShardState m_state = new FacebookShardState();
 	private FacebookShardState m_uncommitedState = null;
+	private UUID m_activeTxn = null;
 	
 	private static final String FILE_NAME = "facebookstate.txt";
 	private static final String FILE_NAME_TEMP = "facebookstate_temp.txt";
 	
-	private void saveState() {
-		this.saveStateInFile(this.m_state, FILE_NAME);
+	private boolean saveState() {
+		return this.saveStateInFile(this.m_state, FILE_NAME);
 	}
 	
-	private void saveUncommitedState() {
-		this.saveStateInFile(this.m_uncommitedState, FILE_NAME_TEMP);
+	private boolean saveUncommitedState() {
+		return this.saveStateInFile(this.m_uncommitedState, FILE_NAME_TEMP);
 	}
 	
-	private void saveStateInFile(FacebookShardState state, String file) {
+	private boolean saveStateInFile(FacebookShardState state, String file) {
+		boolean success = false;
 		try {
 			String content = FacebookShardState.serialize(state);
 			
 			PersistentStorageWriter psw = m_node.getWriter(file, false);
 			psw.write(content);
 			psw.close();
+			success = true;
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+		
+		return success;
 	}
 	
 	public void recoverFromCrash() {
@@ -201,15 +207,19 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 	 * API: IFacebookServer.writeMessageAll
 	 */
 	public String writeMessageAll(String from, String transactionId, String message) throws FacebookException {
-		
-		Set<String> logins = this.m_state.getUserLogins();
-		
-		Message m = new Message(from, message);
-		
+
 		if (this.m_uncommitedState != null) {
 			throw new FacebookException(FacebookException.CONCURRENT_TRANSACTIONS_NOT_ALLOWED, transactionId);
 		}
 		
+		if (this.m_activeTxn != null) {
+			throw new FacebookException(FacebookException.CONCURRENT_TRANSACTIONS_NOT_ALLOWED, transactionId);
+		}
+		
+		Set<String> logins = this.m_state.getUserLogins();
+		Message m = new Message(from, message);
+		
+		this.m_activeTxn = UUID.fromString(transactionId);
 		this.m_uncommitedState = this.m_state.clone();
 		
 		for (String login: logins) {
@@ -219,13 +229,40 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 			}
 		}
 
-		this.saveUncommitedState();
+		// Save uncommited state to disk
+		//
+		// TODO-sergio: saving state here is not the right thing to do... instead, we  
+		// should only store the message, separately from the actual shard state. Then,    
+		// during prepare(), the message should be added to the current state and saved 
+		// to disk. Otherwise, if other methods are called between the execution of
+		// the write_message_all and the commit, the state that we're saving now will 
+		// overwrite the changes from the other methods.
+		// Also, no command should be allowed to execute between the prepare() and the 
+		// commit(), for the same reason.
+		
+		boolean saved;
+		saved = this.saveUncommitedState();
+		if (!saved) {
+			abort(m_activeTxn);
+			throw new FacebookException(FacebookException.CANNOT_SAVE_STATE);
+		}
 		
 		return transactionId;
 	}
 	
 	public void writeMessageAllCommit() {
+		boolean success;
+		
 		this.m_state = this.m_uncommitedState;
+		// TODO: must ensure that this *NEVER* fails! Currently it can fail!
+		// This should be something that is guaranteed to succeed, maybe a file
+		// rename after deleting the file with the final name. 
+		success = this.saveState();
+		if (!success)
+		{
+			m_node.error("CATASTROPHIC FAILURE! commit() failed, the changes are lost and the system is inconsistent"); 
+		}
+		
 		this.m_uncommitedState = null;
 		deleteTempFile();
 	}
@@ -268,4 +305,61 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 
 		return sb.toString();
 	}
+	
+	/**
+	 * Called by 2pc to inform the node that it must abort the 
+	 * active transaction.
+	 */
+	public void abort(UUID transactionId)
+	{
+		if (transactionId.compareTo(m_activeTxn) == 0)
+		{
+			this.writeMessageAllAbort();
+			m_activeTxn = null;
+		}
+		else 
+		{
+			// Unknown transaction, safe to ignore
+		}
+	}
+	
+	/**
+	 * Called by 2pc to inform the node that it must commit the 
+	 * active transaction.
+	 */
+	public void commit(UUID transactionId)
+	{
+		if (transactionId.compareTo(m_activeTxn) == 0)
+		{
+			this.writeMessageAllCommit();
+			m_activeTxn = null;
+		}
+		else
+		{
+			// TODO: handle this case (not sure how :p) 
+		}
+	}
+	
+	/**
+	 * Called by 2pc to inform the node that it should prepare to commit
+	 * the active transaction (i.e. save state in durable storage).
+	 * Returns true if the state is properly saved, false otherwise.
+	 */
+	public boolean prepare(UUID transactionId)
+	{
+		if (transactionId.compareTo(m_activeTxn) == 0)
+		{
+			// Transaction IDs match, merge pending message and save state in
+			// a temporary file.
+			
+			// TODO-sergio: actually do the above. See comments in write_message_all().
+			return true;
+		}
+		else
+		{
+			// Unknown transaction, return failure
+			return false;
+		}
+	}
+	
 }

@@ -2,6 +2,7 @@ package node.rpc;
 import java.util.Hashtable;
 import java.util.LinkedList;
 import java.util.Queue;
+import java.util.UUID;
 import java.util.Vector;
 import node.facebook.FacebookException;
 import node.reliable.ReliableDeliveryNode;
@@ -54,26 +55,7 @@ public class RPCNode extends ReliableDeliveryNode
 		//this.recoverTempFileFromCrash();
 	}
 	
-	/**
-	 * Parses the commands sent to the client by the simulator or the emulator.
-	 */
-	/*
-	@Override
-	public void onCommand(String command)
-	{
-		_commandQueue.add(command);
-		
-		// If the _commandQueue was empty, execute the command now.
-		// Otherwise it'll be executed when the current command finishes.
-		
-		// TODO: allowing multiple simultaneous commands for now
-		//if (_commandQueue.size() == 1)
-		{
-			executeClientCommand(command);
-		}								
-	}
-	*/
-	
+
 	public void callMethod(int targetSender, String methodName, Vector<String> params, Integer replyId, RPCStub caller) 
 	{
 		if (caller != null)
@@ -179,12 +161,7 @@ public class RPCNode extends ReliableDeliveryNode
 		if (methodCall.getMethodName().startsWith("reply_"))
 		{
 			// Timed out while sending a reply to a command.
-			//
-			// TODO: Need to add a timer to the caller, so that it
-			// doesn't get blocked waiting for a command's reply
-			// forever. 
-
-			// Ignore for now;
+			// Ignore for now -- the caller will timeout as well.
 		}
 		else
 		{
@@ -222,31 +199,29 @@ public class RPCNode extends ReliableDeliveryNode
 	}
 	
 	/**
-	 * Called by 2pc
-	 * 
-	 * TODO-sergio: add this at facebook node
+	 * Called by 2pc to inform the node that it must abort the 
+	 * active transaction.
 	 */
-	public void abort()
+	public void abort(UUID transactionId)
 	{
 		
 	}
 	
 	/**
-	 * Called by 2pc
-	 * 
-	 * TODO-sergio: add this at facebook node
+	 * Called by 2pc to inform the node that it must commit the 
+	 * active transaction.
 	 */
-	public void commit()
+	public void commit(UUID transactionId)
 	{
 		
 	}
 	
 	/**
-	 * Called by 2pc
-	 * 
-	 * TODO-sergio: add this at facebook node
+	 * Called by 2pc to inform the node that it should prepare to commit
+	 * the active transaction (i.e. save state in durable storage).
+	 * Returns true if the state is properly saved, false otherwise.
 	 */
-	public boolean saveToDisk()
+	public boolean prepare(UUID transactionId)
 	{
 		return false;
 	}

@@ -121,7 +121,7 @@ public class TwoPhaseCommitContext
 		Decision decision = Decision.Commit;
 		
 		for (Participant participant : _participants) {
-			if (participant.getVote() != Vote.No)
+			if (participant.getVote() == Vote.No)
 			{
 				decision = Decision.Abort;
 				break;

@@ -1,5 +1,6 @@
 package node.facebook;
 
+import java.util.UUID;
 import java.util.Vector;
 
 import node.rpc.RPCMethodCall;
@@ -56,7 +57,7 @@ public class FacebookRPCNode extends RPCNode {
 	public TwoPhaseCommitNode get2PC() {
 		return m_twoPhase;
 	}
-	
+
 	@Override
 	public void onCommand(String command) {
 		boolean handled = false;
@@ -82,4 +83,37 @@ public class FacebookRPCNode extends RPCNode {
 		// Use a different prefix to be easy to distinguish
 		System.out.println(">>>> " + s);
 	}
+	
+	/**
+	 * Called by 2pc to inform the node that it must abort the 
+	 * active transaction.
+	 */
+	@Override
+	public void abort(UUID transactionId)
+	{
+		m_shard.abort(transactionId);
+	}
+	
+	/**
+	 * Called by 2pc to inform the node that it must commit the 
+	 * active transaction.
+	 */
+	@Override
+	public void commit(UUID transactionId)
+	{
+		m_shard.commit(transactionId);
+	}
+	
+	/**
+	 * Called by 2pc to inform the node that it should prepare to commit
+	 * the active transaction (i.e. save state in durable storage).
+	 * Returns true if the state is properly saved, false otherwise.
+	 */
+	@Override
+	public boolean prepare(UUID transactionId)
+	{
+		return m_shard.prepare(transactionId);
+	}
+	
 }
+
