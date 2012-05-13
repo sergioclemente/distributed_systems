@@ -1,8 +1,6 @@
 package node.facebook;
 
 import java.io.IOException;
-import java.util.HashSet;
-import java.util.Hashtable;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -312,7 +310,7 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 	 */
 	public void abort(UUID transactionId)
 	{
-		if (transactionId.compareTo(m_activeTxn) == 0)
+		if (m_activeTxn != null && transactionId.compareTo(m_activeTxn) == 0)
 		{
 			this.writeMessageAllAbort();
 			m_activeTxn = null;
@@ -329,7 +327,7 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 	 */
 	public void commit(UUID transactionId)
 	{
-		if (transactionId.compareTo(m_activeTxn) == 0)
+		if (m_activeTxn != null && transactionId.compareTo(m_activeTxn) == 0)
 		{
 			this.writeMessageAllCommit();
 			m_activeTxn = null;
@@ -347,7 +345,7 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 	 */
 	public boolean prepare(UUID transactionId)
 	{
-		if (transactionId.compareTo(m_activeTxn) == 0)
+		if (m_activeTxn != null && transactionId.compareTo(m_activeTxn) == 0)
 		{
 			// Transaction IDs match, merge pending message and save state in
 			// a temporary file.

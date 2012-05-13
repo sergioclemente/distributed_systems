@@ -1,6 +1,5 @@
 package node.facebook;
 import java.util.Hashtable;
-import java.util.Vector;
 import java.util.UUID;
 import node.rpc.IFacebookServer;
 import node.rpc.IFacebookServerReply;
@@ -349,6 +348,7 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 				{
 					// We've received a success reply from all participant shards.
 					// Time to start the 2PC protocol.
+					// When 2PC completes, we'll be notified via this.onTwoPhaseCommitComplete().
 					m_node.get2PC().startTwoPhaseCommit(m_activeTxn);
 				}
 			}
@@ -362,7 +362,7 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 			// RPC call failed
 			onMethodFailed(sender, "write_message_all", result);
 			
-			if (txnid.compareTo(m_activeTxn) == 0)
+			if (m_activeTxn != null && txnid.compareTo(m_activeTxn) == 0)
 			{
 				m_node.get2PC().abortTwoPhaseCommit(m_activeTxn);
 				m_activeTxn = null;
@@ -394,5 +394,24 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 	{
 		String errorMsg = String.format(FacebookRPCNode.ERROR_MESSAGE_FORMAT, methodName, from, result);
 		user_info(String.format("NODE %d: %s", m_node.addr, errorMsg));
+	}
+	
+	/**
+	 * onTwoPhaseCommitComplete() is called by the 2PC coordinator when
+	 * the transaction commits or aborts
+	 */
+	public void onTwoPhaseCommitComplete(UUID transactionId, boolean committed)
+	{
+		if (m_activeTxn != null && m_activeTxn.compareTo(transactionId) == 0)
+		{
+			// The active transaction either committed or aborted.
+			// In any case, the only thing we need to do is forget the
+			// active transaction id.
+			m_activeTxn = null;
+		}
+		else
+		{
+			m_node.error("Received 2PC commit/abort notification for unknown transaction: " + transactionId.toString());
+		}
 	}
 }

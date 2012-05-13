@@ -3,7 +3,6 @@ package node.facebook;
 import java.util.UUID;
 import java.util.Vector;
 
-import node.rpc.RPCMethodCall;
 import node.rpc.RPCNode;
 import node.rpc.I2pcParticipant;
 import node.twophasecommit.TwoPhaseCommitNode;
@@ -114,6 +113,14 @@ public class FacebookRPCNode extends RPCNode {
 	{
 		return m_shard.prepare(transactionId);
 	}
-	
+
+	/**
+	 * onTwoPhaseCommitComplete() is called by the 2PC coordinator when
+	 * the transaction commits or aborts
+	 */
+	public void onTwoPhaseCommitComplete(UUID transactionId, boolean committed)
+	{
+		m_frontEnd.onTwoPhaseCommitComplete(transactionId, committed);
+	}
 }
 

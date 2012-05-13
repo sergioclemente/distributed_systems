@@ -227,6 +227,15 @@ public class RPCNode extends ReliableDeliveryNode
 	}
 		
 	/**
+	 * onTwoPhaseCommitComplete() is called by the 2PC coordinator when
+	 * the transaction commits or aborts
+	 */
+	public void onTwoPhaseCommitComplete(UUID transactionId, boolean committed)
+	{
+		
+	}
+	
+	/**
 	 * bindRpcMethod()	
 	 */
 	public void bindRpcMethod(String methodName, RPCSkeleton skeleton)

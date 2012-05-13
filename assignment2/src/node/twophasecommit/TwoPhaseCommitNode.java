@@ -151,6 +151,9 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 			beginSendAbort(participant.getId(), context.getId());
 		}		
 		
+		// Notify frontend that the operation aborted
+		m_node.onTwoPhaseCommitComplete(context.getId(), false);
+
 		context.setFinished(true);
 		saveContext(context);
 	}	
@@ -203,6 +206,9 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 		
 		context.getParticipant(m_node.addr).setFinished(true);
 		saveContext(context);
+		
+		// Clear participant context so that we can start a new transaction
+		_participantContext = null;
 	}
 
 	private void commitTwoPhaseCommit(UUID twoPhaseCommitContextId) {
@@ -221,6 +227,9 @@ public class TwoPhaseCommitNode implements I2pcCoordinator, I2pcParticipant, I2p
 		for (Participant participant : participants) {
 			beginSendCommit(participant.getId(), context.getId());
 		}
+		
+		// Notify frontend that the operation committed
+		m_node.onTwoPhaseCommitComplete(context.getId(), true);
 		
 		context.setFinished(true);
 		saveContext(context);
