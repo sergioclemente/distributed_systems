@@ -58,10 +58,10 @@ public class FacebookRPCNode extends RPCNode {
 	}
 
 	@Override
-	public void onCommand(String command) {
+	public void onCommand(String command) {		
 		if (this.m_frontEnd != null) {
 			m_frontEnd.onCommand(command);
-		}
+		} 
 	}
 
 	@Override
