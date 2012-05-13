@@ -224,11 +224,17 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 	
 	public void writeMessageAllCommit() {
 		this.m_pendingState = null;
+		this.m_stateImmutable = false;
 		
 		deleteTempFile();
 	}
 	
 	public void writeMessageAllAbort() {
+		if (this.m_pendingState == null) {
+			this.m_stateImmutable = false;
+			return;
+		}
+		
 		// Remove message from state
 		for (Message m : this.m_pendingState.getPendingMessages()) {
 			List<Message> messages = this.m_state.getUserMessages(m.getToLogin());
@@ -237,7 +243,7 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 			messages.remove(m);
 		}
 		
-		this.m_pendingState = new FacebookPendingState();
+		this.m_pendingState = null;
 		deleteTempFile();
 	}
 	
