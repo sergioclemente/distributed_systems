@@ -7,6 +7,9 @@ import java.util.Set;
 import java.util.Vector;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonParser;
 
 public class FacebookShardState {
 	private Hashtable<String, User> users = new Hashtable<String, User>();
@@ -98,7 +101,13 @@ public class FacebookShardState {
 	// Serialization
 	public static String serialize(FacebookShardState state) {
 		Gson g = new Gson();
-		return g.toJson(state);
+		String uglyJSONString = g.toJson(state);
+		
+		Gson gson = new GsonBuilder().setPrettyPrinting().create();
+		JsonParser jp = new JsonParser();
+		
+		JsonElement je = jp.parse(uglyJSONString);
+		return gson.toJson(je);
 	}
 	
 	public static FacebookShardState deserialize(String str) {
