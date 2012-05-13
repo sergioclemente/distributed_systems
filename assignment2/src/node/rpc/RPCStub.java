@@ -70,7 +70,7 @@ public abstract class RPCStub
 		
 		// Wait up to 9 ticks for an RPC reply to arrive
 		Callback cb = new Callback(m_timeoutMethod, this, new Object[] { s_replyId });
-		m_node.addTimeout(cb, 9);
+		m_node.addTimeout(cb, 3+6+9);
 		
 		return s_replyId;
 	}

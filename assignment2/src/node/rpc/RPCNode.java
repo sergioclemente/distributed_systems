@@ -52,7 +52,6 @@ public class RPCNode extends ReliableDeliveryNode
 	public void start()
 	{
 		super.start();
-		//this.recoverTempFileFromCrash();
 	}
 	
 

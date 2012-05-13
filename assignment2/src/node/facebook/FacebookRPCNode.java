@@ -59,17 +59,8 @@ public class FacebookRPCNode extends RPCNode {
 
 	@Override
 	public void onCommand(String command) {
-		boolean handled = false;
-
-		// Let the facebook frontend take the command first
-		// TODO: move this to a chain of responsibility
 		if (this.m_frontEnd != null) {
-			handled = m_frontEnd.onCommand(command);
-		}
-
-		if (!handled) {
-			// See if the 2PC coordinator can handle this command
-			handled = m_twoPhase.onCommand(command);
+			m_frontEnd.onCommand(command);
 		}
 	}
 

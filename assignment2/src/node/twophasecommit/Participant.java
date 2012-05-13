@@ -3,10 +3,10 @@ package node.twophasecommit;
 public class Participant
 {
 	private int _participant;
-	
 	private Vote _vote;
-	
 	private Decision _decision;
+	private int _replyId;
+	
 	
 	/**
 	 * Tells if the 2pc has decided and run, should only be set after either abort or commit runs successfully.
@@ -18,6 +18,7 @@ public class Participant
 		_participant = participantId;
 		_vote = Vote.None;
 		_decision = Decision.NotDecided;
+		_replyId = 0;
 	}
 	
 	public int getId() {
@@ -48,5 +49,15 @@ public class Participant
 	public void setFinished(boolean finished)
 	{
 		_finished = finished;
+	}
+	
+	public int getReplyId()
+	{
+		return _replyId;
+	}
+	
+	public void setReplyId(int id)
+	{
+		_replyId = id;
 	}
 }

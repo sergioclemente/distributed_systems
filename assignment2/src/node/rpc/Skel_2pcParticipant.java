@@ -25,28 +25,21 @@ public class Skel_2pcParticipant extends RPCSkeleton
 		switch (methodName)
 		{
 		case "startTransaction":
-			content = m_impl.startTransaction(methodArgs.get(0));
+			content = m_impl.startTransaction(methodArgs.get(0), methodArgs.get(1));
 			break;
 			
 		case "requestPrepare":
-			content = m_impl.requestPrepare(methodArgs.get(0));
+			content = m_impl.requestPrepare(methodArgs.get(0), methodArgs.get(1));
 			break;
 			
 		case "commitTransaction":
-			content = m_impl.commitTransaction(methodArgs.get(0));
+			content = m_impl.commitTransaction(methodArgs.get(0), methodArgs.get(1));
 			break;
 			
 		case "abortTransaction":
-			content = m_impl.abortTransaction(methodArgs.get(0));
+			content = m_impl.abortTransaction(methodArgs.get(0), methodArgs.get(1));
 			break;
 			
-		case "backcompat":
-			String orig = "";
-			for (String str : methodArgs)
-				orig += str + " ";
-			content = m_impl.backcompat(orig.trim());
-			break;
-
 		default:
 			assert false;
 			break;
@@ -62,7 +55,6 @@ public class Skel_2pcParticipant extends RPCSkeleton
 		node.bindRpcMethod("requestPrepare", this);
 		node.bindRpcMethod("commitTransaction", this);
 		node.bindRpcMethod("abortTransaction", this);
-		node.bindRpcMethod("backcompat", this);
 	}
 }
 

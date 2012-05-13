@@ -495,9 +495,6 @@ public class ReliableDeliveryNode extends Node {
 			}
 			
 			current.removeFromWaitingForAckList(packet.getSequence());
-			
-			// TODO: only ACK messages that are actually about to be delivered.
-			// TODO: Make it so ACK(x) means ACK for every message from 0 to x.
 		}
 		else
 		{

@@ -10,36 +10,30 @@ public class Stub_2pcParticipant extends RPCStub implements I2pcParticipant
 		m_callback = callback;
 	}
 		
-	public String startTransaction(String transactionId) 
+	public String startTransaction(String coordId, String transactionId) 
 	{
-		super.invoke("startTransaction", transactionId);
+		super.invoke("startTransaction", coordId, transactionId);
 		return null;
 	}
 
-	public String requestPrepare(String transactionId) 
+	public String requestPrepare(String coordId, String transactionId) 
 	{
-		super.invoke("requestPrepare", transactionId);
+		super.invoke("requestPrepare", coordId, transactionId);
 		return null;
 	}
 
-	public String commitTransaction(String transactionId) 
+	public String commitTransaction(String coordId, String transactionId) 
 	{
-		super.invoke("commitTransaction", transactionId);
+		super.invoke("commitTransaction", coordId, transactionId);
 		return null;
 	}
 
-	public String abortTransaction(String transactionId) 
+	public String abortTransaction(String coordId, String transactionId) 
 	{
-		super.invoke("abortTransaction", transactionId);
+		super.invoke("abortTransaction", coordId, transactionId);
 		return null;
 	}
 
-	public String backcompat(String blob) 
-	{
-		super.invoke("backcompat", blob);
-		return null;
-	}
-	
 	@Override
 	protected void dispatchReply(int replyId, String methodName, int sender, int result, String content)
 	{
@@ -59,10 +53,6 @@ public class Stub_2pcParticipant extends RPCStub implements I2pcParticipant
 
 		case "abortTransaction":
 			m_callback.reply_abortTransaction(replyId, sender, result, content);
-			break;
-			
-		case "backcompat":
-			m_callback.reply_backcompat(replyId, sender, result, content);
 			break;
 			
 		default:
