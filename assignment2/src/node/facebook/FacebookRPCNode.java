@@ -5,12 +5,12 @@ import java.util.Vector;
 
 import node.rpc.RPCNode;
 import node.rpc.I2pcParticipant;
-import node.twophasecommit.TwoPhaseCommitNode;
+import node.twophasecommit.TwoPhaseCommit;
 
 public class FacebookRPCNode extends RPCNode {
 	private FacebookShardSystem m_shard;
 	private FacebookFrontendSystem m_frontEnd;
-	private TwoPhaseCommitNode m_twoPhase;
+	private TwoPhaseCommit m_twoPhase;
 
 	private static Vector<Integer> s_shardAddresses = new Vector<Integer>();
 
@@ -37,7 +37,7 @@ public class FacebookRPCNode extends RPCNode {
 		this.m_shard = new FacebookShardSystem(this);
 
 		this.user_info("Starting 2PC coordinator support on address " + this.addr);
-		this.m_twoPhase = new TwoPhaseCommitNode(this);
+		this.m_twoPhase = new TwoPhaseCommit(this);
 
 		// Enable this node to receive RPC calls for these interfaces
 		this.bindFacebookServerImpl(m_shard);
@@ -53,7 +53,7 @@ public class FacebookRPCNode extends RPCNode {
 		return s_shardAddresses;
 	}
 
-	public TwoPhaseCommitNode get2PC() {
+	public TwoPhaseCommit get2PC() {
 		return m_twoPhase;
 	}
 
