@@ -45,8 +45,10 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 	}
 	
 	public void recoverFromCrash() {
-		// TODO-sergio: fix restoreState() to NOT return null when there is no state to recover
-		//this.m_state = restoreState(FILE_NAME);
+		this.m_state = restoreState(FILE_NAME);
+		if (this.m_state == null) {
+			this.m_state = new FacebookShardState();
+		}
 		this.m_uncommitedState = restoreState(FILE_NAME_TEMP);
 	}
 	

@@ -160,6 +160,7 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 				}
 					
 				default:
+					user_info("invalid command!");
 					assert false;
 			}
 		}
