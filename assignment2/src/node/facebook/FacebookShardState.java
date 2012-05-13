@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.Vector;
 
+import util.NodeUtility;
+
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
@@ -96,29 +98,5 @@ public class FacebookShardState {
 	protected void user_info(String s) {
 		// Use a different prefix to be easy to distinguish
 		System.out.println(">>>> " + s);
-	}
-	
-	// Serialization
-	public static String serialize(FacebookShardState state) {
-		Gson g = new Gson();
-		String uglyJSONString = g.toJson(state);
-		
-		Gson gson = new GsonBuilder().setPrettyPrinting().create();
-		JsonParser jp = new JsonParser();
-		
-		JsonElement je = jp.parse(uglyJSONString);
-		return gson.toJson(je);
-	}
-	
-	public static FacebookShardState deserialize(String str) {
-		Gson g = new Gson();
-		return g.fromJson(str, FacebookShardState.class);
-	}
-	
-	// Clone
-	public FacebookShardState clone() {
-		// Dumb way to implement the clone, but lets get things done then optimize later
-		String content = this.serialize(this);
-		return deserialize(content);
 	}
 }

@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.Vector;
+
+import util.NodeUtility;
 import edu.washington.cs.cse490h.lib.Utility;
 import node.rpc.IFacebookServer;
 import edu.washington.cs.cse490h.lib.PersistentStorageReader;
@@ -14,67 +16,22 @@ import edu.washington.cs.cse490h.lib.PersistentStorageWriter;
 public class FacebookShardSystem extends BaseFacebookSystem implements IFacebookServer {
 
 	private FacebookShardState m_state = new FacebookShardState();
-	private FacebookShardState m_uncommitedState = null;
+	private FacebookPendingState m_pendingState = null;
 	private UUID m_activeTxn = null;
+	private boolean m_stateImmutable = false;
 	
 	private static final String FILE_NAME = "facebookstate.txt";
-	private static final String FILE_NAME_TEMP = "facebookstate_temp.txt";
-	
-	private boolean saveState() {
-		return this.saveStateInFile(this.m_state, FILE_NAME);
-	}
-	
-	private boolean saveUncommitedState() {
-		return this.saveStateInFile(this.m_uncommitedState, FILE_NAME_TEMP);
-	}
-	
-	private boolean saveStateInFile(FacebookShardState state, String file) {
-		boolean success = false;
-		try {
-			String content = FacebookShardState.serialize(state);
-			
-			PersistentStorageWriter psw = m_node.getWriter(file, false);
-			psw.write(content);
-			psw.close();
-			success = true;
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		
-		return success;
-	}
+	private static final String UNCOMMITED_STATE_FILE = "pendingstate.txt";
 	
 	public void recoverFromCrash() {
-		this.m_state = restoreState(FILE_NAME);
+		this.m_state = (FacebookShardState) NodeUtility.deserializeFromFile(this.m_node, FILE_NAME, FacebookShardState.class);
 		if (this.m_state == null) {
 			this.m_state = new FacebookShardState();
 		}
-		this.m_uncommitedState = restoreState(FILE_NAME_TEMP);
+		// TODO: not restoring m_pendingState. do I need to?
 	}
 	
-	private FacebookShardState restoreState(String filename) {
-		try {
-			if (Utility.fileExists(m_node, filename)) {
-				PersistentStorageReader psr = m_node.getReader(filename);
-				char[] buffer = new char[1024];
-				StringBuffer sb = new StringBuffer();
-				do {
-					int len = psr.read(buffer, 0, 1024);
-					if (len > 0) {
-						sb.append(buffer, 0, len);
-					} else {
-						break;
-					}
-				} while (true);
-				
-				return FacebookShardState.deserialize(sb.toString());
-			}
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		
-		return null;
-	}
+
 	
 	/**
 	 * FacebookShardSystem()
@@ -88,6 +45,10 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 	 * API: IFacebookServer.createUser
 	 */
 	public String createUser(String userName, String password) throws FacebookException {
+		if (m_stateImmutable) {
+			throw new FacebookException(FacebookException.STATE_IMMUTABLE);
+		}
+		
 		if (this.m_state.containsUser(userName)) {
 			throw new FacebookException(FacebookException.USER_ALREADY_EXISTS);
 		} else {
@@ -103,6 +64,10 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 	 * API: IFacebookServer.login
 	 */
 	public String login(String userName, String password) throws FacebookException {
+		if (m_stateImmutable) {
+			throw new FacebookException(FacebookException.STATE_IMMUTABLE);
+		}
+		
 		if (this.m_state.containsUser(userName)) {
 			String token = new SessionToken(userName, createNewSessionSeed()).toString();
 			this.m_state.addSession(token);
@@ -119,6 +84,10 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 	 * API: IFacebookServer.logout
 	 */
 	public String logout(String token) throws FacebookException {
+		if (m_stateImmutable) {
+			throw new FacebookException(FacebookException.STATE_IMMUTABLE);
+		}
+		
 		if (this.m_state.containsSession(token)) {
 			this.m_state.removeSession(token);
 			
@@ -132,6 +101,10 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 	}
 	
 	public String addFriendReceiver(String adderLogin, String receiverLogin) throws FacebookException {
+		if (m_stateImmutable) {
+			throw new FacebookException(FacebookException.STATE_IMMUTABLE);
+		}
+		
 		if (!this.m_state.containsUser(receiverLogin)) {
 			throw new FacebookException(FacebookException.USER_DONT_EXIST);
 		}
@@ -153,6 +126,10 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 	 * API: IFacebookServer.acceptFriend
 	 */
 	public String acceptFriendReceiver(String adderLogin, String receiverLogin) throws FacebookException {
+		if (m_stateImmutable) {
+			throw new FacebookException(FacebookException.STATE_IMMUTABLE);
+		}
+		
 		List<String> requestList;
 		requestList = this.m_state.getPendingRequest(receiverLogin);
 		
@@ -171,6 +148,10 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 	}
 	
 	public String acceptFriendAdder(String token, String adderLogin) throws FacebookException {
+		if (m_stateImmutable) {
+			throw new FacebookException(FacebookException.STATE_IMMUTABLE);
+		}
+		
 		// TODO: either remove session tokens, or auto-add session token to 'receiverLogin'
 		String receiverLogin = token;
 		
@@ -207,8 +188,11 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 	 * API: IFacebookServer.writeMessageAll
 	 */
 	public String writeMessageAll(String from, String transactionId, String message) throws FacebookException {
-
-		if (this.m_uncommitedState != null) {
+		if (m_stateImmutable) {
+			throw new FacebookException(FacebookException.STATE_IMMUTABLE);
+		}
+		
+		if (this.m_pendingState != null) {
 			throw new FacebookException(FacebookException.CONCURRENT_TRANSACTIONS_NOT_ALLOWED, transactionId);
 		}
 		
@@ -217,65 +201,54 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 		}
 		
 		Set<String> logins = this.m_state.getUserLogins();
-		Message m = new Message(from, message);
 		
 		this.m_activeTxn = UUID.fromString(transactionId);
-		this.m_uncommitedState = this.m_state.clone();
+		this.m_pendingState = new FacebookPendingState();
 		
-		for (String login: logins) {
+		for (String toLogin: logins) {
 			// Just add the message if the users are friends
-			if (this.m_uncommitedState.isFriendOf(login, from)) {
-				this.m_uncommitedState.addMessage(login, m);
+			
+			// TODO: Accessing the state which could change between writeMessageAll. Probably
+			// The right way would be create a snapshot just to check the friendships
+			if (this.m_state.isFriendOf(toLogin, from)) {
+				this.m_pendingState.getPendingMessages().add(new Message(from, toLogin, message));
 			}
-		}
-
-		// Save uncommited state to disk
-		//
-		// TODO-sergio: saving state here is not the right thing to do... instead, we  
-		// should only store the message, separately from the actual shard state. Then,    
-		// during prepare(), the message should be added to the current state and saved 
-		// to disk. Otherwise, if other methods are called between the execution of
-		// the write_message_all and the commit, the state that we're saving now will 
-		// overwrite the changes from the other methods.
-		// Also, no command should be allowed to execute between the prepare() and the 
-		// commit(), for the same reason.
-		
-		boolean saved;
-		saved = this.saveUncommitedState();
-		if (!saved) {
-			abort(m_activeTxn);
-			throw new FacebookException(FacebookException.CANNOT_SAVE_STATE);
 		}
 		
 		return transactionId;
 	}
 	
+	private boolean saveState() {
+		return NodeUtility.saveStateInFile(this.m_node, this.m_state, FILE_NAME);
+	}
+	
 	public void writeMessageAllCommit() {
-		boolean success;
+		this.m_pendingState = null;
 		
-		this.m_state = this.m_uncommitedState;
-		// TODO: must ensure that this *NEVER* fails! Currently it can fail!
-		// This should be something that is guaranteed to succeed, maybe a file
-		// rename after deleting the file with the final name. 
-		success = this.saveState();
-		if (!success)
-		{
-			m_node.error("CATASTROPHIC FAILURE! commit() failed, the changes are lost and the system is inconsistent"); 
-		}
-		
-		this.m_uncommitedState = null;
 		deleteTempFile();
 	}
 	
 	public void writeMessageAllAbort() {
-		this.m_uncommitedState = null;
+		// Remove message from state
+		for (Message m : this.m_pendingState.getPendingMessages()) {
+			List<Message> messages = this.m_state.getUserMessages(m.getToLogin());
+			
+			// Remove will be a no-op if it had been removed before...
+			messages.remove(m);
+		}
+		
+		this.m_pendingState = new FacebookPendingState();
 		deleteTempFile();
+	}
+	
+	private boolean savePendingState() {
+		return NodeUtility.saveStateInFile(this.m_node, this.m_pendingState, UNCOMMITED_STATE_FILE);
 	}
 	
 	private void deleteTempFile() {
 		try {
-			if (Utility.fileExists(this.m_node, FILE_NAME_TEMP)) {
-				PersistentStorageWriter f = m_node.getWriter(FILE_NAME_TEMP, false);
+			if (Utility.fileExists(this.m_node, UNCOMMITED_STATE_FILE)) {
+				PersistentStorageWriter f = m_node.getWriter(UNCOMMITED_STATE_FILE, false);
 				f.delete();
 			}
 		} catch (IOException e) {
@@ -349,11 +322,17 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 	{
 		if (m_activeTxn != null && transactionId.compareTo(m_activeTxn) == 0)
 		{
-			// Transaction IDs match, merge pending message and save state in
-			// a temporary file.
+			// Apply pending state to real state and save
+			for (Message m : this.m_pendingState.getPendingMessages()) {
+				this.m_state.addMessage(m.getToLogin(), m);
+			}
 			
-			// TODO-sergio: actually do the above. See comments in write_message_all().
-			return true;
+			boolean saved = this.saveState();
+			
+			// TODO: do i need to set this to true when save fails?
+			this.m_stateImmutable = true;
+			
+			return saved;
 		}
 		else
 		{

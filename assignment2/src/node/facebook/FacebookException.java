@@ -13,6 +13,7 @@ public class FacebookException extends RPCException {
 	public static final int COMMIT_IN_PROGRESS = 9;
 	public static final int PARTICIPANT_ALREADY_INCLUDED = 10;
 	public static final int CANNOT_SAVE_STATE = 11;
+	public static final int STATE_IMMUTABLE = 12;
 	
 	public FacebookException(int exceptionCode)
 	{

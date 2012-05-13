@@ -2,8 +2,9 @@ package node.facebook;
 
 public class Message {
 	
-	public Message(String fromLogin, String message) {
+	public Message(String fromLogin, String toLogin, String message) {
 		super();
+		this.setToLogin(toLogin);
 		this.fromLogin = fromLogin;
 		this.message = message;
 	}
@@ -24,6 +25,15 @@ public class Message {
 		this.message = message;
 	}
 	
+	public String getToLogin() {
+		return toLogin;
+	}
+
+	public void setToLogin(String toLogin) {
+		this.toLogin = toLogin;
+	}
+
 	private String fromLogin;
 	private String message;
+	private String toLogin;
 }

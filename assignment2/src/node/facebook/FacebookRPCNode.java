@@ -17,7 +17,7 @@ public class FacebookRPCNode extends RPCNode {
 	public static final String ERROR_MESSAGE_FORMAT = "Error: %s on facebook server %d. Returned error code was %s";
 
 	static {
-		for (int i = 0; i <= 5; i++) {
+		for (int i = 1; i <= 5; i++) {
 			s_shardAddresses.add(i);
 		}
 	}

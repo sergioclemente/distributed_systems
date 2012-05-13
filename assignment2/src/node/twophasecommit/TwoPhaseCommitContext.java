@@ -3,6 +3,8 @@ package node.twophasecommit;
 import java.util.UUID;
 import java.util.Vector;
 import settings.MessagingSettings;
+import util.NodeUtility;
+
 import com.google.gson.Gson;
 import node.facebook.FacebookException;
 
@@ -137,8 +139,7 @@ public class TwoPhaseCommitContext
 	
 	public String serialize()
 	{
-		Gson gson = new Gson();
-		return gson.toJson(this);
+		return NodeUtility.serialize(this);
 	}
 	
 	public static TwoPhaseCommitContext deserialize(String json)
