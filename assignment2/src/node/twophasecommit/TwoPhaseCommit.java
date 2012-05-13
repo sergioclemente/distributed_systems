@@ -10,10 +10,12 @@ import java.util.UUID;
 import java.util.Vector;
 
 import settings.MessagingSettings;
+import util.NodeUtility;
 
 import edu.washington.cs.cse490h.lib.Callback;
 import edu.washington.cs.cse490h.lib.PersistentStorageReader;
 import edu.washington.cs.cse490h.lib.PersistentStorageWriter;
+import edu.washington.cs.cse490h.lib.Utility;
 
 import node.rpc.I2pcCoordinator;
 import node.rpc.I2pcCoordinatorReply;
@@ -419,7 +421,7 @@ public class TwoPhaseCommit implements I2pcCoordinator, I2pcParticipant, I2pcCoo
 	
 	private void recoverContexts()
 	{
-		String[] files = m_node.listFiles();
+		String[] files = NodeUtility.listFiles(this.m_node);
 		
 		for (int i = 0; i < files.length; i++) {
 			if (files[i].startsWith("2pc-"))
