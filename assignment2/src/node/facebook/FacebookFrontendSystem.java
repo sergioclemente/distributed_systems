@@ -357,8 +357,10 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 	{
 		UUID txnid = getTransactionIdFromReplyId(replyId);
 		
-		// Frontend could have crashed, lets return null
-		if (txnid == null) {
+		if (m_activeTxn == null)
+		{
+			// Only take action if there is an active transaction (i.e. non-null)
+			user_info(String.format("write_message_all: Ignoring reply from shard %d regarding inactive transaction %s", sender, reply));
 			return;
 		}
 		
@@ -367,7 +369,7 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 			// RPC call succeeded
 			user_info(String.format("write_message_all: Shard %d returned ok. returnValue=%s", sender, reply));
 
-			if (txnid != null && txnid.compareTo(m_activeTxn) == 0)
+			if (txnid.compareTo(m_activeTxn) == 0)
 			{
 				m_shardCount--;
 				if (m_shardCount == 0)
@@ -380,22 +382,21 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 			}
 			else
 			{
-				user_info(String.format("write_message_all: Ignoring success reply from shard %d regarding transaction %s", sender, reply));
+				user_info(String.format("write_message_all: Ignoring success reply from shard %d regarding transaction %s", sender, txnid));
 			}
 		}
 		else
 		{
 			// RPC call failed
-			onMethodFailed(sender, "write_message_all", result);
-			
-			if (txnid != null && m_activeTxn != null && txnid.compareTo(m_activeTxn) == 0)
+			if (txnid.compareTo(m_activeTxn) == 0)
 			{
+				user_info(String.format("write_message_all: Aborting transaction %s due to failure from shard %d", m_activeTxn, sender));
 				m_node.get2PC().abortTwoPhaseCommit(m_activeTxn);
 				m_activeTxn = null;
 			}
 			else
 			{
-				user_info(String.format("write_message_all: Ignoring failed reply from shard %d regarding transaction %s", sender, reply));
+				user_info(String.format("write_message_all: Ignoring failed reply from shard %d regarding unknown transaction %s", sender, txnid));
 			}
 		}
 	}
