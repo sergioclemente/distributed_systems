@@ -9,7 +9,6 @@ import java.util.Vector;
 import util.NodeUtility;
 import edu.washington.cs.cse490h.lib.Utility;
 import node.rpc.IFacebookServer;
-import edu.washington.cs.cse490h.lib.PersistentStorageReader;
 import edu.washington.cs.cse490h.lib.PersistentStorageWriter;
 
 
@@ -208,9 +207,6 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 		
 		for (String toLogin: logins) {
 			// Just add the message if the users are friends
-			
-			// TODO: Accessing the state which could change between writeMessageAll. Probably
-			// The right way would be create a snapshot just to check the friendships
 			if (this.m_state.isFriendOf(toLogin, from)) {
 				this.m_pendingState.getPendingMessages().add(new Message(from, toLogin, message));
 			}

@@ -149,7 +149,7 @@ public class TwoPhaseCommitContext
 	}
 
 	public int getTimeout() {
-		return _participants.size() * MessagingSettings.MaxTimeout;
+		return 2 * MessagingSettings.MaxTimeout;
 	}
 }
 
