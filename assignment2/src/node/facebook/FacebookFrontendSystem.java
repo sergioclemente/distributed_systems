@@ -344,17 +344,30 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 		}
 	}
 	
+	private UUID getTransactionIdFromReplyId(int replyId) {
+		if (this.m_replyMap.containsKey(replyId)) {
+			return m_replyMap.get(replyId);
+		} else {
+			return null;
+		}
+	}
+	
 	@Override
 	public void reply_writeMessageAll(int replyId, int sender, int result, String reply)
 	{
-		UUID txnid = m_replyMap.get(replyId);
+		UUID txnid = getTransactionIdFromReplyId(replyId);
+		
+		// Frontend could have crashed, lets return null
+		if (txnid == null) {
+			return;
+		}
 		
 		if (result == 0)
-		{
+		{	
 			// RPC call succeeded
 			user_info(String.format("write_message_all: Shard %d returned ok. returnValue=%s", sender, reply));
 
-			if (txnid.compareTo(m_activeTxn) == 0)
+			if (txnid != null && txnid.compareTo(m_activeTxn) == 0)
 			{
 				m_shardCount--;
 				if (m_shardCount == 0)
@@ -375,7 +388,7 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 			// RPC call failed
 			onMethodFailed(sender, "write_message_all", result);
 			
-			if (m_activeTxn != null && txnid.compareTo(m_activeTxn) == 0)
+			if (txnid != null && m_activeTxn != null && txnid.compareTo(m_activeTxn) == 0)
 			{
 				m_node.get2PC().abortTwoPhaseCommit(m_activeTxn);
 				m_activeTxn = null;
