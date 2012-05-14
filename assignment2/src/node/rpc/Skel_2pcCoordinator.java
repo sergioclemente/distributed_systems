@@ -22,23 +22,21 @@ public class Skel_2pcCoordinator extends RPCSkeleton
 	{
 		String content = null;
 		
-		switch (methodName)
+		if (methodName.compareToIgnoreCase("notifyPrepared") == 0)
 		{
-		case "notifyPrepared":
 			content = m_impl.notifyPrepared(methodArgs.get(0));
-			break;
-			
-		case "notifyAborted":
+		} 
+		else if (methodName.compareToIgnoreCase("notifyAborted") == 0)
+		{
 			content = m_impl.notifyAborted(methodArgs.get(0));
-			break;
-			
-		case "queryDecision":
+		} 
+		else if (methodName.compareToIgnoreCase("queryDecision") == 0)
+		{
 			content = m_impl.queryDecision(methodArgs.get(0));
-			break;
-			
-		default:
+		}
+		else
+		{
 			assert false;
-			break;
 		}
 		
 		return content;

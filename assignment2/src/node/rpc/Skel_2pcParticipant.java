@@ -22,28 +22,25 @@ public class Skel_2pcParticipant extends RPCSkeleton
 	{
 		String content = null;
 	
-		
-		switch (methodName)
+		if (methodName.compareToIgnoreCase("startTransaction") == 0)
 		{
-		case "startTransaction":
 			content = m_impl.startTransaction(methodArgs.get(0), methodArgs.get(1));
-			break;
-			
-		case "requestPrepare":
+		}
+		else if (methodName.compareToIgnoreCase("requestPrepare") == 0)
+		{
 			content = m_impl.requestPrepare(methodArgs.get(0), methodArgs.get(1));
-			break;
-			
-		case "commitTransaction":
+		}
+		else if (methodName.compareToIgnoreCase("commitTransaction") == 0)
+		{
 			content = m_impl.commitTransaction(methodArgs.get(0), methodArgs.get(1));
-			break;
-			
-		case "abortTransaction":
+		}
+		else if (methodName.compareToIgnoreCase("abortTransaction") == 0)
+		{
 			content = m_impl.abortTransaction(methodArgs.get(0), methodArgs.get(1));
-			break;
-			
-		default:
+		}
+		else 
+		{
 			assert false;
-			break;
 		}
 		
 		return content;

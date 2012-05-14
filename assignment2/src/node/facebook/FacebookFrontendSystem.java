@@ -73,103 +73,91 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 		try
 		{
 			String op = parts[0].toLowerCase();
-			switch(op) {
-				case "login":
-				{
-					IFacebookServer shard = getShardFromLogin(login);
-					String pwd = parts[2];
-					
-					shard.login(login, pwd);
-					break;
-				}
-				case "logout":
-				{
-					IFacebookServer shard = getShardFromLogin(login);
-					String token = parts[1];
-					
-					shard.logout(token);
-					break;
-				}
-				case "create_user":
-				{
-					IFacebookServer shard = getShardFromLogin(login);
-					String pwd = parts[2];
-					
-					shard.createUser(login, pwd);
-					break;
-				}
-				case "add_friend":
-				{
-					String adderLogin = login;
-					String receiverLogin = parts[2];
-					
-					IFacebookServer shardReceiver = getShardFromLogin(receiverLogin);
-					shardReceiver.addFriendReceiver(adderLogin, receiverLogin);
-					break;
-				}
+			if (op.compareTo("login") == 0) 
+			{
+				IFacebookServer shard = getShardFromLogin(login);
+				String pwd = parts[2];
 				
-				case "accept_friend":
-				{
-					String receiverLogin = login;
-					String adderLogin = parts[2];
-					IFacebookServer shardReceiver = getShardFromLogin(login);
-					IFacebookServer shardAdder = getShardFromLogin(adderLogin);
-					
-					// Send the accept_friend command
-					shardReceiver.acceptFriendReceiver(adderLogin, receiverLogin);
-					
-					// Store this info so that we can process the 2nd part once the
-					// 1st part succeeds
-					PendingAcceptFriendInfo info = new PendingAcceptFriendInfo();
-					info.loginAdder = adderLogin;
-					info.loginReceiver = receiverLogin;
-					info.shardAdder = shardAdder;
-					m_pendingAcceptFriend.put(RPCStub.getCurrentReplyId(), info);
-					break;
-				}
+				shard.login(login, pwd);
+			}
+			else if (op.compareTo("logout") == 0) 
+			{
+				IFacebookServer shard = getShardFromLogin(login);
+				String token = parts[1];
 				
-				case "write_message_all":
-				{
-					// TODO: write_message_all should only contact shards that actually
-					// contain friends of the user.
-					if (m_activeTxn == null) {
-						// Start a new distributed transaction for this call
-						m_activeTxn = m_node.get2PC().startTransaction();
-						m_shardCount = 0;
+				shard.logout(token);
+			}
+			else if (op.compareTo("create_user") == 0) 
+			{
+				IFacebookServer shard = getShardFromLogin(login);
+				String pwd = parts[2];
+				
+				shard.createUser(login, pwd);
+			}
+			else if (op.compareTo("add_friend") == 0) 
+			{
+				String adderLogin = login;
+				String receiverLogin = parts[2];
+				
+				IFacebookServer shardReceiver = getShardFromLogin(receiverLogin);
+				shardReceiver.addFriendReceiver(adderLogin, receiverLogin);
+			}
+			else if (op.compareTo("accept_friend") == 0) 
+			{
+				String receiverLogin = login;
+				String adderLogin = parts[2];
+				IFacebookServer shardReceiver = getShardFromLogin(login);
+				IFacebookServer shardAdder = getShardFromLogin(adderLogin);
+				
+				// Send the accept_friend command
+				shardReceiver.acceptFriendReceiver(adderLogin, receiverLogin);
+				
+				// Store this info so that we can process the 2nd part once the
+				// 1st part succeeds
+				PendingAcceptFriendInfo info = new PendingAcceptFriendInfo();
+				info.loginAdder = adderLogin;
+				info.loginReceiver = receiverLogin;
+				info.shardAdder = shardAdder;
+				m_pendingAcceptFriend.put(RPCStub.getCurrentReplyId(), info);
+			}
+			else if (op.compareTo("write_message_all") == 0) 
+			{
+				// TODO: write_message_all should only contact shards that actually
+				// contain friends of the user.
+				if (m_activeTxn == null) {
+					// Start a new distributed transaction for this call
+					m_activeTxn = m_node.get2PC().startTransaction();
+					m_shardCount = 0;
+					
+					String message = getMessageBody(command);
+	
+					for (int shardId : FacebookRPCNode.getShardAddresses()) {
+						IFacebookServer shard = getShardFromShardAddress(shardId);
+						shard.writeMessageAll(login, m_activeTxn.toString(), message);
+						m_replyMap.put(RPCStub.getCurrentReplyId(), m_activeTxn);
 						
-						String message = getMessageBody(command);
-		
-						for (int shardId : FacebookRPCNode.getShardAddresses()) {
-							IFacebookServer shard = getShardFromShardAddress(shardId);
-							shard.writeMessageAll(login, m_activeTxn.toString(), message);
-							m_replyMap.put(RPCStub.getCurrentReplyId(), m_activeTxn);
-							
-							// Register this shard as a participant
-							m_node.get2PC().addParticipant(m_activeTxn, shardId);
-							m_shardCount++;
-						}
-					} else {
-						m_node.error("There already is an active write_message_all transaction: " + m_activeTxn.toString());
+						// Register this shard as a participant
+						m_node.get2PC().addParticipant(m_activeTxn, shardId);
+						m_shardCount++;
 					}
-					break;
+				} else {
+					m_node.error("There already is an active write_message_all transaction: " + m_activeTxn.toString());
 				}
-				
-				case "read_message_all":
-				{
-					IFacebookServer shard = getShardFromLogin(login);
-					shard.readMessageAll(parts[1]);
-					break;
-				}
-					
-				case "dump":
-				{
-					IFacebookServer shard = getShardFromShardAddress(Integer.parseInt(parts[1]));
-					shard.dump();
-					break;
-				}
-				default:
-					user_info("invalid command!");
-					assert false;
+			}
+			else if (op.compareTo("read_message_all") == 0) 
+			{
+				IFacebookServer shard = getShardFromLogin(login);
+				shard.readMessageAll(parts[1]);
+			}
+			else if (op.compareTo("dump") == 0) 
+			{
+				IFacebookServer shard = getShardFromShardAddress(Integer.parseInt(parts[1]));
+				shard.dump();
+			}
+			else  
+			{
+				user_info("invalid command!");
+				assert false;
 			}
 		}
 		catch (RPCException ex)

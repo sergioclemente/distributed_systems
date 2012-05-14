@@ -22,45 +22,45 @@ public class Skel_FacebookServer extends RPCSkeleton
 	{
 		String content = null;
 		
-		switch (methodName)
+		if (methodName.compareToIgnoreCase("login") == 0)
 		{
-		case "login":
 			content = m_impl.login(methodArgs.get(0), methodArgs.get(1));
-			break;
-			
-		case "logout":
+		}
+		else if (methodName.compareToIgnoreCase("logout") == 0)
+		{
 			content = m_impl.logout(methodArgs.get(0));
-			break;
-			
-		case "create_user":
+		}
+		else if (methodName.compareToIgnoreCase("create_user") == 0)
+		{
 			content = m_impl.createUser(methodArgs.get(0), methodArgs.get(1));
-			break;
-			
-		case "add_friend_receiver":
+		}
+		else if (methodName.compareToIgnoreCase("add_friend_receiver") == 0)
+		{
 			content = m_impl.addFriendReceiver(methodArgs.get(0), methodArgs.get(1));
-			break;
-			
-		case "accept_friend_adder":
+		}
+		else if (methodName.compareToIgnoreCase("accept_friend_adder") == 0)
+		{
 			content = m_impl.acceptFriendAdder(methodArgs.get(0), methodArgs.get(1));
-			break;
-			
-		case "accept_friend_receiver":
+		}
+		else if (methodName.compareToIgnoreCase("accept_friend_receiver") == 0)
+		{
 			content = m_impl.acceptFriendReceiver(methodArgs.get(0), methodArgs.get(1));
-			break;			
-		case "write_message_all":
+		}
+		else if (methodName.compareToIgnoreCase("write_message_all") == 0)
+		{
 			content = m_impl.writeMessageAll(methodArgs.get(0), methodArgs.get(1), methodArgs.get(2));
-			break;
-			
-		case "read_message_all":
+		}
+		else if (methodName.compareToIgnoreCase("read_message_all") == 0)
+		{
 			content = m_impl.readMessageAll(methodArgs.get(0));
-			break;
-			
-		case "dump":
+		}
+		else if (methodName.compareToIgnoreCase("dump") == 0)
+		{
 			content = m_impl.dump();
-			break;
-		default:
+		}
+		else
+		{
 			assert false;
-			break;
 		}
 		
 		return content;

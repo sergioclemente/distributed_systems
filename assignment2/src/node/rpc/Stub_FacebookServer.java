@@ -67,46 +67,45 @@ public class Stub_FacebookServer extends RPCStub implements IFacebookServer
 	@Override
 	protected void dispatchReply(int replyId, String methodName, int sender, int result, String content)
 	{
-		switch (methodName)
+		if (methodName.compareToIgnoreCase("login") == 0)
 		{
-		case "login":
 			m_callback.reply_login(replyId, sender, result, content);
-			break;
-			
-		case "logout":
+		}
+		else if (methodName.compareToIgnoreCase("logout") == 0)
+		{
 			m_callback.reply_logout(replyId, sender, result, content);
-			break;
-			
-		case "create_user":
+		}
+		else if (methodName.compareToIgnoreCase("create_user") == 0)
+		{
 			m_callback.reply_createUser(replyId, sender, result, content);
-			break;
-
-		case "add_friend_receiver":
+		}
+		else if (methodName.compareToIgnoreCase("add_friend_receiver") == 0)
+		{
 			m_callback.reply_addFriend_receiver(replyId, sender, result, content);
-			break;
-			
-		case "accept_friend_adder":
+		}
+		else if (methodName.compareToIgnoreCase("accept_friend_adder") == 0)
+		{
 			m_callback.reply_acceptFriend_adder(replyId, sender, result, content);
-			break;
-			
-		case "accept_friend_receiver":
+		}
+		else if (methodName.compareToIgnoreCase("accept_friend_receiver") == 0)
+		{
 			m_callback.reply_acceptFriend_receiver(replyId, sender, result, content);
-			break;
-			
-		case "write_message_all":
+		}
+		else if (methodName.compareToIgnoreCase("write_message_all") == 0)
+		{
 			m_callback.reply_writeMessageAll(replyId, sender, result, content);
-			break;
-			
-		case "read_message_all":
+		}
+		else if (methodName.compareToIgnoreCase("read_message_all") == 0)
+		{
 			m_callback.reply_readMessageAll(replyId, sender, result, content);
-			break;
-		case "dump":
+		}
+		else if (methodName.compareToIgnoreCase("dump") == 0)
+		{
 			m_callback.reply_dump(replyId, sender, result,  null);
-			break;
-			
-		default:
+		}
+		else 
+		{
 			m_node.error("Unexpected method reply: " + methodName);
-			break;
 		}
 	}
 }

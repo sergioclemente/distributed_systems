@@ -31,23 +31,21 @@ public class Stub_2pcCoordinator extends RPCStub implements I2pcCoordinator
 	@Override
 	protected void dispatchReply(int replyId, String methodName, int sender, int result, String content)
 	{
-		switch (methodName)
+		if (methodName.compareToIgnoreCase("notifyPrepared") == 0)
 		{
-		case "notifyPrepared":
 			m_callback.reply_notifyPrepared(replyId, sender, result, content);
-			break;
-
-		case "notifyAborted":
+		}
+		else if (methodName.compareToIgnoreCase("notifyAborted") == 0)
+		{
 			m_callback.reply_notifyAborted(replyId, sender, result, content);
-			break;
-
-		case "queryDecision":
+		}
+		else if (methodName.compareToIgnoreCase("queryDecision") == 0)
+		{
 			m_callback.reply_queryDecision(replyId, sender, result, content);
-			break;
-
-		default:
+		}
+		else
+		{
 			m_node.error("Unexpected method reply: " + methodName);
-			break;
 		}
 	}
 

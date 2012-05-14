@@ -37,27 +37,25 @@ public class Stub_2pcParticipant extends RPCStub implements I2pcParticipant
 	@Override
 	protected void dispatchReply(int replyId, String methodName, int sender, int result, String content)
 	{
-		switch (methodName)
+		if (methodName.compareToIgnoreCase("startTransaction") == 0)
 		{
-		case "startTransaction":
 			m_callback.reply_startTransaction(replyId, sender, result, content);
-			break;
-			
-		case "requestPrepare":
+		}
+		else if (methodName.compareToIgnoreCase("requestPrepare") == 0)
+		{
 			m_callback.reply_requestPrepare(replyId, sender, result, content);
-			break;
-			
-		case "commitTransaction":
+		}
+		else if (methodName.compareToIgnoreCase("commitTransaction") == 0)
+		{
 			m_callback.reply_commitTransaction(replyId, sender, result, content);
-			break;
-
-		case "abortTransaction":
+		}
+		else if (methodName.compareToIgnoreCase("abortTransaction") == 0)
+		{
 			m_callback.reply_abortTransaction(replyId, sender, result, content);
-			break;
-			
-		default:
+		}
+		else
+		{
 			m_node.error("Unexpected method reply: " + methodName);
-			break;
 		}
 	}
 
