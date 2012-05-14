@@ -16,13 +16,16 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 
 	private FacebookShardState m_state = new FacebookShardState();
 	private FacebookPendingState m_pendingState = null;
-	private UUID m_activeTxn = null;
 	private boolean m_stateImmutable = false;
 	
 	private static final String FILE_NAME = "facebookstate.txt";
 	private static final String UNCOMMITED_STATE_FILE = "pendingstate.txt";
 	
 	public void recoverFromCrash() {
+		NodeUtility.recoverFromCrash(this.m_node, FILE_NAME);
+		NodeUtility.recoverFromCrash(this.m_node, UNCOMMITED_STATE_FILE);
+		
+		
 		this.m_state = (FacebookShardState) NodeUtility.deserializeFromFile(this.m_node, FILE_NAME, FacebookShardState.class);
 		if (this.m_state == null) {
 			this.m_state = new FacebookShardState();
@@ -196,14 +199,8 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 			throw new FacebookException(FacebookException.CONCURRENT_TRANSACTIONS_NOT_ALLOWED, transactionId);
 		}
 		
-		if (this.m_activeTxn != null) {
-			throw new FacebookException(FacebookException.CONCURRENT_TRANSACTIONS_NOT_ALLOWED, transactionId);
-		}
-		
 		Set<String> logins = this.m_state.getUserLogins();
-		
-		this.m_activeTxn = UUID.fromString(transactionId);
-		this.m_pendingState = new FacebookPendingState();
+		this.m_pendingState = new FacebookPendingState(UUID.fromString(transactionId));
 		
 		for (String toLogin: logins) {
 			// Just add the message if the users are friends
@@ -313,10 +310,12 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 	 */
 	public void abort(UUID transactionId)
 	{
-		if (m_activeTxn != null && transactionId.compareTo(m_activeTxn) == 0)
+		UUID tid = this.m_pendingState != null ? 
+				this.m_pendingState.getActiveTxn() : null;
+		
+		if (tid != null && transactionId.compareTo(tid) == 0)
 		{
 			this.writeMessageAllAbort();
-			m_activeTxn = null;
 		}
 		else 
 		{
@@ -330,10 +329,12 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 	 */
 	public void commit(UUID transactionId)
 	{
-		if (m_activeTxn != null && transactionId.compareTo(m_activeTxn) == 0)
+		UUID tid = this.m_pendingState != null ? 
+				this.m_pendingState.getActiveTxn() : null;
+		
+		if (tid != null && transactionId.compareTo(tid) == 0)
 		{	
 			this.writeMessageAllCommit();
-			m_activeTxn = null;
 		}
 		else
 		{
@@ -348,7 +349,10 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 	 */
 	public boolean prepare(UUID transactionId)
 	{
-		if (m_activeTxn != null && transactionId.compareTo(m_activeTxn) == 0)
+		UUID tid = this.m_pendingState != null ? 
+				this.m_pendingState.getActiveTxn() : null;
+		
+		if (tid != null && transactionId.compareTo(tid) == 0)
 		{
 			return this.writeMessageAllPrepare();
 		}
@@ -370,7 +374,6 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 			System.out.println(this.m_pendingState.toString());			
 		}
 		
-		
 		return null;
-	}	
+	}
 }

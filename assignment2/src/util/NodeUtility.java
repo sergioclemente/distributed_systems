@@ -1,6 +1,7 @@
 package util;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 
 import node.facebook.FacebookShardState;
@@ -33,21 +34,97 @@ public class NodeUtility {
         return f.list();
     }
     
+    public static void recoverFromCrash(Node node, String filename) {
+		try {
+			String tempfilename = getTempFileName(filename);
+			
+			if (Utility.fileExists(node, tempfilename)) {
+				PersistentStorageReader psw_bck = node.getReader(tempfilename);
+				if (!psw_bck.ready()) {
+					PersistentStorageWriter f = node.getWriter(tempfilename, false);
+					f.delete();
+				} else {
+					psw_bck.close();
+
+					String oldContents = readAll(psw_bck);
+					PersistentStorageWriter psw = node.getWriter(filename, false);
+					psw.write(oldContents);
+					psw.close();
+				}
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+    
     
 	public static boolean saveStateInFile(Node node, Object obj, String file) {
 		boolean success = false;
 		try {
-			String content = NodeUtility.serialize( obj);
+			String content = NodeUtility.serialize(obj);
 			
-			PersistentStorageWriter psw = node.getWriter(file, false);
-			psw.write(content);
-			psw.close();
+			updateFileContents(node, file, content);
 			success = true;
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 		
 		return success;
+	}
+	
+	public static String getTempFileName(String filename){
+		return filename + ".temp";
+	}
+	
+	public static void updateFileContents(Node node, String filename, String newContent) throws IOException {
+		try {
+			// read old file
+			String oldContent = readAllLines(node, filename);
+			
+			// write old to backup
+			String tempfilename = getTempFileName(filename);
+			PersistentStorageWriter psw_bck = node.getWriter(tempfilename, false);
+			psw_bck.write(oldContent);
+			psw_bck.close();
+
+			// update new
+			PersistentStorageWriter psw = node.getWriter(filename, false);
+			psw.write(newContent);
+			psw.close();
+
+			// delete temporary file
+			PersistentStorageWriter f = node.getWriter(tempfilename, false);
+			f.delete();
+		} catch (IOException e) {
+			throw e;
+		}
+	}
+	
+	// some helpers for transaction
+	private static String readAllLines(Node node, String filename)  {
+		try {
+			PersistentStorageReader psr = node.getReader(filename);
+			return readAll(psr);
+		} catch (FileNotFoundException e) {
+			return null;
+		}
+
+	}
+	
+	private static String readAll(PersistentStorageReader psr) {
+		StringBuffer sb = new StringBuffer();
+
+		String line;
+		try {
+			while ((line=psr.readLine()) != null) {
+				sb.append(line);
+				sb.append('\n');
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+		return sb.toString();
 	}
     
     public static String serialize(Object obj) {
