@@ -361,5 +361,20 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 			// Unknown transaction, return failure
 			return false;
 		}
+	}
+
+
+
+	@Override
+	public String dump() {
+		System.out.println(this.m_state.toString());
+		
+		if (this.m_pendingState != null) {
+			System.out.println("PENDING");
+			System.out.println(this.m_pendingState.toString());			
+		}
+		
+		
+		return null;
 	}	
 }

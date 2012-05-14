@@ -55,12 +55,12 @@ public class NodeUtility {
 		return gson.toJson(obj);
     }
     
-	public static Object deserialize(String str, Class c) {
+	public static <T> Object deserialize(String str, Class<T> c) {
 		Gson g = new Gson();
 		return g.fromJson(str, c);
 	}
 	
-	public static Object deserializeFromFile(Node node, String filename, Class c) {
+	public static <T> Object deserializeFromFile(Node node, String filename, Class<T> c) {
 		try {
 			if (Utility.fileExists(node, filename)) {
 				PersistentStorageReader psr = node.getReader(filename);

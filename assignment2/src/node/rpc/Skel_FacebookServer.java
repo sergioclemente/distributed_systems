@@ -55,6 +55,9 @@ public class Skel_FacebookServer extends RPCSkeleton
 			content = m_impl.readMessageAll(methodArgs.get(0));
 			break;
 			
+		case "dump":
+			content = m_impl.dump();
+			break;
 		default:
 			assert false;
 			break;
@@ -74,6 +77,7 @@ public class Skel_FacebookServer extends RPCSkeleton
 		node.bindRpcMethod("accept_friend_receiver", this);
 		node.bindRpcMethod("write_message_all", this);
 		node.bindRpcMethod("read_message_all", this);
+		node.bindRpcMethod("dump", this);
 	}
 }
 

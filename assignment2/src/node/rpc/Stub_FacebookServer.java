@@ -58,6 +58,11 @@ public class Stub_FacebookServer extends RPCStub implements IFacebookServer
 		return null;
 	}
 
+	@Override
+	public String dump() {
+		super.invoke("dump");
+		return null;
+	}
 	
 	@Override
 	protected void dispatchReply(int replyId, String methodName, int sender, int result, String content)
@@ -95,12 +100,14 @@ public class Stub_FacebookServer extends RPCStub implements IFacebookServer
 		case "read_message_all":
 			m_callback.reply_readMessageAll(replyId, sender, result, content);
 			break;
+		case "dump":
+			m_callback.reply_dump(replyId, sender, result,  null);
+			break;
 			
 		default:
 			m_node.error("Unexpected method reply: " + methodName);
 			break;
 		}
 	}
-
 }
 

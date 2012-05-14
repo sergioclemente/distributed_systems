@@ -10,4 +10,5 @@ public interface IFacebookServerReply
 	void reply_acceptFriend_receiver(int replyId, int sender, int result, String reply);
 	void reply_writeMessageAll(int replyId, int sender, int result, String reply);
 	void reply_readMessageAll(int replyId, int sender, int result, String reply);
+	void reply_dump(int replyId, int sender, int result, String reply);
 }

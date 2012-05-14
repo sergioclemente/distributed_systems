@@ -60,7 +60,7 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 		return methodName.equals("login") || methodName.equals("logout") ||
 				methodName.equals("create_user") || methodName.equals("add_friend") ||
 				methodName.equals("accept_friend") || methodName.equals("read_message_all") ||
-				methodName.equals("write_message_all");
+				methodName.equals("write_message_all") || methodName.equals("dump");
 	}
 
 	private void callMethodOnShards(String command, String[] parts) {
@@ -159,6 +159,12 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 					break;
 				}
 					
+				case "dump":
+				{
+					IFacebookServer shard = getShardFromShardAddress(Integer.parseInt(parts[1]));
+					shard.dump();
+					break;
+				}
 				default:
 					user_info("invalid command!");
 					assert false;
@@ -184,6 +190,10 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 	}
 	
 	private String extractLoginFromCommand(String methodName, String[] parts) {
+		if (methodName.equals("dump")) {
+			return "";
+		}
+		
 		// login and create_user receive the username directly
 		// the other commands receive the session instead
 		if (methodName.equals("login") || methodName.equals("create_user")) {
@@ -414,5 +424,11 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 		{
 			m_node.error("Received 2PC commit/abort notification for unknown transaction: " + transactionId.toString());
 		}
+	}
+
+	@Override
+	public void reply_dump(int replyId, int sender, int result, String reply) {
+		// TODO Auto-generated method stub
+		
 	}
 }
