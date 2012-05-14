@@ -422,6 +422,7 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 		}
 		else
 		{
+			// Note: this may happen during 2PC recovery, which is ok
 			m_node.error("Received 2PC commit/abort notification for unknown transaction: " + transactionId.toString());
 		}
 	}

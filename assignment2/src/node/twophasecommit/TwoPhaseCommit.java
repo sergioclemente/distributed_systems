@@ -358,12 +358,9 @@ public class TwoPhaseCommit implements I2pcCoordinator, I2pcParticipant, I2pcCoo
 	 */
 	public void onWaitForDecisionTimeout(UUID twoPhaseCommitContextId)
 	{
-		if (_participantContext == null) 
-		{
-			m_node.error("onWaitForDecisionTimeout: this node is not participanting in a transaction as a particiapnt.");
-			return;
-		}
-		
+		if (_participantContext == null)
+			return;	// if we already reached a decision, don't have to do anything else.
+			
 		if (_participantContext.getId().compareTo(twoPhaseCommitContextId) != 0)
 		{
 			m_node.error("onWaitForDecisionTimeout: this node is not participanting in this transaction as a particiapnt.");
