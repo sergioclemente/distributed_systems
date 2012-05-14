@@ -343,8 +343,8 @@ public class TwoPhaseCommit implements I2pcCoordinator, I2pcParticipant, I2pcCoo
 	public void onWaitForVotesTimeout(UUID twoPhaseCommitContextId)
 	{
 		TwoPhaseCommitContext context = _twoPhaseCommitContexts.get(twoPhaseCommitContextId);
-		
-		if (!context.getFinished())
+
+		if (context.getDecision() == Decision.NotDecided)
 		{
 			abortTwoPhaseCommit(twoPhaseCommitContextId);
 		}
