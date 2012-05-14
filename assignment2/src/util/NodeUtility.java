@@ -39,14 +39,15 @@ public class NodeUtility {
 			String tempfilename = getTempFileName(filename);
 			
 			if (Utility.fileExists(node, tempfilename)) {
-				PersistentStorageReader psw_bck = node.getReader(tempfilename);
-				if (!psw_bck.ready()) {
+				PersistentStorageReader psr_bck = node.getReader(tempfilename);
+				
+				if (!psr_bck.ready()) {
+					psr_bck.close();
+					
 					PersistentStorageWriter f = node.getWriter(tempfilename, false);
 					f.delete();
 				} else {
-					psw_bck.close();
-
-					String oldContents = readAll(psw_bck);
+					String oldContents = readAll(psr_bck);
 					PersistentStorageWriter psw = node.getWriter(filename, false);
 					psw.write(oldContents);
 					psw.close();
@@ -63,8 +64,7 @@ public class NodeUtility {
 		try {
 			String content = NodeUtility.serialize(obj);
 			
-			updateFileContents(node, file, content);
-			success = true;
+			return updateFileContents(node, file, content);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -76,7 +76,7 @@ public class NodeUtility {
 		return filename + ".temp";
 	}
 	
-	public static void updateFileContents(Node node, String filename, String newContent) throws IOException {
+	public static boolean updateFileContents(Node node, String filename, String newContent) throws IOException {
 		try {
 			// read old file
 			String oldContent = readAllLines(node, filename);
@@ -95,8 +95,10 @@ public class NodeUtility {
 			// delete temporary file
 			PersistentStorageWriter f = node.getWriter(tempfilename, false);
 			f.delete();
+			
+			return true;
 		} catch (IOException e) {
-			throw e;
+			return false;
 		}
 	}
 	
