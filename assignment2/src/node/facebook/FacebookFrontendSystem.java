@@ -22,6 +22,8 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 	
 	private Hashtable<Integer, IFacebookServer> m_stubs = new Hashtable<Integer, IFacebookServer>();
 	private Hashtable<Integer, PendingAcceptFriendInfo> m_pendingAcceptFriend = new Hashtable<Integer, PendingAcceptFriendInfo>();
+	private Hashtable<Integer, UUID> m_replyMap = new Hashtable<Integer, UUID>();
+	
 	private UUID m_activeTxn;
 	private int m_shardCount;
 	
@@ -138,9 +140,9 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 						String message = getMessageBody(command);
 		
 						for (int shardId : FacebookRPCNode.getShardAddresses()) {
-							// TODO: add 2pc here
 							IFacebookServer shard = getShardFromShardAddress(shardId);
 							shard.writeMessageAll(login, m_activeTxn.toString(), message);
+							m_replyMap.put(RPCStub.getCurrentReplyId(), m_activeTxn);
 							
 							// Register this shard as a participant
 							m_node.get2PC().addParticipant(m_activeTxn, shardId);
@@ -345,7 +347,7 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 	@Override
 	public void reply_writeMessageAll(int replyId, int sender, int result, String reply)
 	{
-		UUID txnid = UUID.fromString(reply);
+		UUID txnid = m_replyMap.get(replyId);
 		
 		if (result == 0)
 		{
@@ -423,7 +425,7 @@ public class FacebookFrontendSystem extends BaseFacebookSystem implements IFaceb
 		else
 		{
 			// Note: this may happen during 2PC recovery, which is ok
-			m_node.error("Received 2PC commit/abort notification for unknown transaction: " + transactionId.toString());
+			m_node.error("(ok during recovery) Received 2PC commit/abort notification for unknown transaction: " + transactionId.toString());
 		}
 	}
 
