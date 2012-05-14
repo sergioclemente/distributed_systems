@@ -81,11 +81,14 @@ public class NodeUtility {
 			// read old file
 			String oldContent = readAllLines(node, filename);
 			
-			// write old to backup
+			
 			String tempfilename = getTempFileName(filename);
-			PersistentStorageWriter psw_bck = node.getWriter(tempfilename, false);
-			psw_bck.write(oldContent);
-			psw_bck.close();
+			// write old to backup
+			if (oldContent != null) {
+				PersistentStorageWriter psw_bck = node.getWriter(tempfilename, false);
+				psw_bck.write(oldContent);
+				psw_bck.close();
+			}
 
 			// update new
 			PersistentStorageWriter psw = node.getWriter(filename, false);
