@@ -342,8 +342,13 @@ public class TwoPhaseCommit implements I2pcCoordinator, I2pcParticipant, I2pcCoo
 	 */
 	public void onWaitForVotesTimeout(UUID twoPhaseCommitContextId)
 	{
-		// TODO-livar: this must not be called (or should be a no-op) if the transaction did commit.
-		abortTwoPhaseCommit(twoPhaseCommitContextId);
+		TwoPhaseCommitContext context = _twoPhaseCommitContexts.get(twoPhaseCommitContextId);
+		
+		if (!context.getFinished())
+		{
+			// TODO-livar: this must not be called (or should be a no-op) if the transaction did commit.
+			abortTwoPhaseCommit(twoPhaseCommitContextId);
+		}
 	}
 	
 	/**
@@ -722,11 +727,11 @@ public class TwoPhaseCommit implements I2pcCoordinator, I2pcParticipant, I2pcCoo
 		{
 			if (reply.equalsIgnoreCase("Commit"))
 			{
-				commitTransaction(String.valueOf(coordinatorId), reply);
+				commitTransaction(String.valueOf(coordinatorId), twoPhaseCommitContextId.toString());
 			}
 			else if (reply.equalsIgnoreCase("Abort"))
 			{
-				abortTransaction(String.valueOf(coordinatorId), reply);
+				abortTransaction(String.valueOf(coordinatorId), twoPhaseCommitContextId.toString());
 			}
 			else 
 			{
