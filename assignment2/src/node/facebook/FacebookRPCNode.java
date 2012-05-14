@@ -38,8 +38,6 @@ public class FacebookRPCNode extends RPCNode {
 
 		// Enable this node to receive RPC calls for these interfaces
 		this.bindFacebookServerImpl(m_shard);
-		this.bind2pcCoordinatorImpl(m_twoPhase);
-		this.bind2pcParticipantImpl((I2pcParticipant) m_twoPhase);
 
 		if (this.m_shard != null) {
 			this.m_shard.recoverFromCrash();
@@ -48,6 +46,9 @@ public class FacebookRPCNode extends RPCNode {
 		// Create the 2pc after we recover from the crash otherwise the state will be messed up
 		this.user_info("Starting 2PC coordinator support on address " + this.addr);
 		this.m_twoPhase = new TwoPhaseCommit(this);
+		
+		this.bind2pcCoordinatorImpl(m_twoPhase);
+		this.bind2pcParticipantImpl((I2pcParticipant) m_twoPhase);
 	}
 	
 	public static Vector<Integer> getShardAddresses() {
