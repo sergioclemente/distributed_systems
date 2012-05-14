@@ -217,31 +217,38 @@ public class TwoPhaseCommit implements I2pcCoordinator, I2pcParticipant, I2pcCoo
 	 * @param abort
 	 */
 	private void abortOrCommit(TwoPhaseCommitContext context, boolean abort) {
-		if (_participantContext.getDecision() != Decision.NotDecided)
+		try
 		{
-			// Spew an error if this happens, for debugging purposes 
-			m_node.error("2PC inconsistency detected: must only abort/commit undecided transactions!");
+			if (_participantContext.getDecision() != Decision.NotDecided)
+			{
+				// Spew an error if this happens, for debugging purposes 
+				m_node.error("2PC inconsistency detected: must only abort/commit undecided transactions!");
+			}
+			
+			if (abort)
+			{
+				_participantContext.setDecision(Decision.Abort);
+				saveContext(_participantContext);
+				m_node.abort(context.getId());
+			}
+			else
+			{
+				_participantContext.setDecision(Decision.Commit);
+				saveContext(_participantContext);
+				m_node.commit(context.getId());
+			}		
+			
+			context.getParticipant(m_node.addr).setFinished(true);
+			saveContext(context);
+			
+			// Clear participant context so that we can start a new transaction
+			_participantContext = null;
+			deleteParticipantTwoPhaseCommitFile();
 		}
-		
-		if (abort)
+		catch (Exception e)
 		{
-			_participantContext.setDecision(Decision.Abort);
-			saveContext(_participantContext);
-			m_node.abort(context.getId());
+			
 		}
-		else
-		{
-			_participantContext.setDecision(Decision.Commit);
-			saveContext(_participantContext);
-			m_node.commit(context.getId());
-		}
-		
-		context.getParticipant(m_node.addr).setFinished(true);
-		saveContext(context);
-		
-		// Clear participant context so that we can start a new transaction
-		_participantContext = null;
-		deleteParticipantTwoPhaseCommitFile();
 	}
 
 	private void deleteParticipantTwoPhaseCommitFile()
