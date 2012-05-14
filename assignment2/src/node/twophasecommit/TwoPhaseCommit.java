@@ -241,8 +241,21 @@ public class TwoPhaseCommit implements I2pcCoordinator, I2pcParticipant, I2pcCoo
 		
 		// Clear participant context so that we can start a new transaction
 		_participantContext = null;
+		deleteParticipantTwoPhaseCommitFile();
 	}
 
+	private void deleteParticipantTwoPhaseCommitFile()
+	{
+		try {
+			if (Utility.fileExists(this.m_node, PARTICIPANT_FILENAME)) {
+				PersistentStorageWriter f = m_node.getWriter(PARTICIPANT_FILENAME, false);
+				f.delete();
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+	
 	/**
 	 * commitTwoPhaseCommit()
 	 * 
