@@ -99,4 +99,10 @@ public class FacebookShardState {
 		// Use a different prefix to be easy to distinguish
 		System.out.println(">>>> " + s);
 	}
+	
+	// Debug helper
+	@Override
+	public String toString() {
+		return NodeUtility.serialize(this);
+	}
 }

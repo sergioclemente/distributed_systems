@@ -28,7 +28,8 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 		if (this.m_state == null) {
 			this.m_state = new FacebookShardState();
 		}
-		// TODO: not restoring m_pendingState. do I need to?
+		
+		this.m_pendingState = (FacebookPendingState) NodeUtility.deserializeFromFile(this.m_node, UNCOMMITED_STATE_FILE, FacebookPendingState.class);
 	}
 	
 
@@ -222,43 +223,68 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 		return NodeUtility.saveStateInFile(this.m_node, this.m_state, FILE_NAME);
 	}
 	
-	public void writeMessageAllCommit() {
-		this.m_pendingState = null;
-		this.m_stateImmutable = false;
+	// Sequence of events
+	// 1) Prepare
+	// 2) Commit or Abort
+	private boolean writeMessageAllPrepare() {
+		// Save the pending state to disk
+		boolean saved = this.savePendingState();
 		
-		deleteTempFile();
+		this.m_stateImmutable = true;
+		return saved;
 	}
 	
-	public void writeMessageAllAbort() {
-		if (this.m_pendingState == null) {
-			this.m_stateImmutable = false;
-			return;
+	public void writeMessageAllCommit() {
+		if (this.m_pendingState != null) {
+			// Apply pending state to real state
+			for (Message m : this.m_pendingState.getPendingMessages()) {
+				this.m_state.addMessage(m.getToLogin(), m);
+			}
 		}
 		
-		// Remove message from state
-		for (Message m : this.m_pendingState.getPendingMessages()) {
-			List<Message> messages = this.m_state.getUserMessages(m.getToLogin());
-			
-			// Remove will be a no-op if it had been removed before...
-			messages.remove(m);
+		this.commitOrAbortCommon();
+	}
+
+	public void writeMessageAllAbort() {
+		if (this.m_pendingState != null) {
+			// Remove message from state
+			for (Message m : this.m_pendingState.getPendingMessages()) {
+				List<Message> messages = this.m_state.getUserMessages(m.getToLogin());
+				
+				// Remove will be a no-op if it had been removed before...
+				messages.remove(m);
+			}
+		}
+		
+		this.commitOrAbortCommon();
+	}
+	
+	private void commitOrAbortCommon() {
+		if (!this.saveState()) {
+			throw new RuntimeException("Cannot save state dude!");
+		}
+		if (!deleteTempFile()) {
+			throw new RuntimeException("Cannot delete temp file dude!");
 		}
 		
 		this.m_pendingState = null;
-		deleteTempFile();
+		this.m_stateImmutable = false;
 	}
 	
 	private boolean savePendingState() {
 		return NodeUtility.saveStateInFile(this.m_node, this.m_pendingState, UNCOMMITED_STATE_FILE);
 	}
 	
-	private void deleteTempFile() {
+	private boolean deleteTempFile() {
 		try {
 			if (Utility.fileExists(this.m_node, UNCOMMITED_STATE_FILE)) {
 				PersistentStorageWriter f = m_node.getWriter(UNCOMMITED_STATE_FILE, false);
 				f.delete();
 			}
+			
+			return true;
 		} catch (IOException e) {
-			e.printStackTrace();
+			return false;
 		}
 	}
 	
@@ -309,7 +335,7 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 	public void commit(UUID transactionId)
 	{
 		if (m_activeTxn != null && transactionId.compareTo(m_activeTxn) == 0)
-		{
+		{	
 			this.writeMessageAllCommit();
 			m_activeTxn = null;
 		}
@@ -328,23 +354,12 @@ public class FacebookShardSystem extends BaseFacebookSystem implements IFacebook
 	{
 		if (m_activeTxn != null && transactionId.compareTo(m_activeTxn) == 0)
 		{
-			// Apply pending state to real state and save
-			for (Message m : this.m_pendingState.getPendingMessages()) {
-				this.m_state.addMessage(m.getToLogin(), m);
-			}
-			
-			boolean saved = this.saveState();
-			
-			// TODO: do i need to set this to true when save fails?
-			this.m_stateImmutable = true;
-			
-			return saved;
+			return this.writeMessageAllPrepare();
 		}
 		else
 		{
 			// Unknown transaction, return failure
 			return false;
 		}
-	}
-	
+	}	
 }

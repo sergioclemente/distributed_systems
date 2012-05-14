@@ -2,6 +2,8 @@ package node.facebook;
 
 import java.util.Vector;
 
+import util.NodeUtility;
+
 public class FacebookPendingState {
 	private Vector<Message> pendingMessages = new Vector<Message>();
 
@@ -11,5 +13,11 @@ public class FacebookPendingState {
 
 	public void setPendingMessages(Vector<Message> pendingMessages) {
 		this.pendingMessages = pendingMessages;
+	}
+	
+	// Debug helper
+	@Override
+	public String toString() {
+		return NodeUtility.serialize(this);
 	}
 }
