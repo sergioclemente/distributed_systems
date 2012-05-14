@@ -37,6 +37,12 @@ public abstract class RPCStub
 		return s_replyId;
 	}
 	
+	protected int invoke(String methodName)
+	{
+		Vector<String> args = new Vector<String>();
+		return invokeInternal(methodName, args);
+	}
+	
 	protected int invoke(String methodName, String arg1)
 	{
 		Vector<String> args = new Vector<String>();
