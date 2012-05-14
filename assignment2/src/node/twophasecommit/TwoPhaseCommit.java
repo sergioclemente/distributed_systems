@@ -219,7 +219,8 @@ public class TwoPhaseCommit implements I2pcCoordinator, I2pcParticipant, I2pcCoo
 	private void abortOrCommit(TwoPhaseCommitContext context, boolean abort) {
 		try
 		{
-			if (_participantContext.getDecision() != Decision.NotDecided)
+			Participant participant = _participantContext.getParticipant(m_node.addr);
+			if (_participantContext.getDecision() != Decision.NotDecided && participant.getFinished())
 			{
 				// Spew an error if this happens, for debugging purposes 
 				m_node.error("2PC inconsistency detected: must only abort/commit undecided transactions!");
@@ -247,7 +248,7 @@ public class TwoPhaseCommit implements I2pcCoordinator, I2pcParticipant, I2pcCoo
 		}
 		catch (Exception e)
 		{
-			
+			m_node.error(e.getMessage());
 		}
 	}
 
@@ -711,8 +712,7 @@ public class TwoPhaseCommit implements I2pcCoordinator, I2pcParticipant, I2pcCoo
 		int coordinatorId = sender;
 		UUID twoPhaseCommitContextId = m_replyMap.get(replyId);
 		
-		TwoPhaseCommitContext context = _twoPhaseCommitContexts.get(twoPhaseCommitContextId);
-		if (context == null) 
+		if (_participantContext.getId().compareTo(twoPhaseCommitContextId) != 0) 
 		{
 			m_node.error("reply_queryDecision: context not found.");
 			return;
