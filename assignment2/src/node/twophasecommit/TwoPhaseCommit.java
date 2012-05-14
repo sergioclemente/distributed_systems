@@ -712,7 +712,7 @@ public class TwoPhaseCommit implements I2pcCoordinator, I2pcParticipant, I2pcCoo
 		int coordinatorId = sender;
 		UUID twoPhaseCommitContextId = m_replyMap.get(replyId);
 		
-		if (_participantContext.getId().compareTo(twoPhaseCommitContextId) != 0) 
+		if (_participantContext == null || _participantContext.getId().compareTo(twoPhaseCommitContextId) != 0) 
 		{
 			m_node.error("reply_queryDecision: context not found.");
 			return;
@@ -720,11 +720,11 @@ public class TwoPhaseCommit implements I2pcCoordinator, I2pcParticipant, I2pcCoo
 
 		try
 		{
-			if (reply == "Commit")
+			if (reply.equalsIgnoreCase("Commit"))
 			{
 				commitTransaction(String.valueOf(coordinatorId), reply);
 			}
-			else if (reply == "Abort")
+			else if (reply.equalsIgnoreCase("Abort"))
 			{
 				abortTransaction(String.valueOf(coordinatorId), reply);
 			}
