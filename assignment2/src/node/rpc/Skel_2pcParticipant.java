@@ -21,6 +21,7 @@ public class Skel_2pcParticipant extends RPCSkeleton
 	protected String invokeInternal(String methodName, Vector<String> methodArgs) throws RPCException
 	{
 		String content = null;
+	
 		
 		switch (methodName)
 		{
