@@ -346,7 +346,6 @@ public class TwoPhaseCommit implements I2pcCoordinator, I2pcParticipant, I2pcCoo
 		
 		if (!context.getFinished())
 		{
-			// TODO-livar: this must not be called (or should be a no-op) if the transaction did commit.
 			abortTwoPhaseCommit(twoPhaseCommitContextId);
 		}
 	}
@@ -400,48 +399,76 @@ public class TwoPhaseCommit implements I2pcCoordinator, I2pcParticipant, I2pcCoo
 	
 	private void recover()
 	{
+		boolean running2pcTermination = false;
+		
+		m_node.info("2pc recovery in progress");
 		recoverContexts();
 		
 		TwoPhaseCommitContext coordinatorContext = getPendingTwoPhaseCommitAsCoordinator();
 		if (coordinatorContext != null)
 		{
-			if (coordinatorContext.getDecision() == Decision.NotDecided || 
-				(coordinatorContext.getDecision() == Decision.Abort && !coordinatorContext.getFinished()))
+			if (coordinatorContext.getFinished())
 			{
-				abortTwoPhaseCommit(coordinatorContext.getId());
+				m_node.error("Inconsistent state detected: must not be pending if already finished");
 			}
-			else {
-				commitTwoPhaseCommit(coordinatorContext.getId());
+			else
+			{
+				if (coordinatorContext.getDecision() == Decision.NotDecided)
+				{
+					// We haven't promised to commit, so it's ok to abort
+					m_node.info("2pc recovery: coordinator aborting pending transaction: " + coordinatorContext.getId().toString());
+					abortTwoPhaseCommit(coordinatorContext.getId());
+				}
+				else
+				{
+					// Simply mark as finished and move on
+					coordinatorContext.setFinished(true);
+					saveContext(coordinatorContext);
+				}
 			}
 		}
 		
 		if (_participantContext != null)
 		{
 			Participant participant = _participantContext.getParticipant(m_node.addr);
-			if (_participantContext.getDecision() == Decision.Commit && !participant.getFinished())
+			if (!participant.getFinished())
 			{
-				abortOrCommit(_participantContext, false);
-			}
-			else if (_participantContext.getDecision() == Decision.Abort && !participant.getFinished())
-			{
-				abortOrCommit(_participantContext, true);
-			}
-			else	
-			{
-				Vote vote = _participantContext.getParticipant(m_node.addr).getVote();
-				if (vote == Vote.No || vote == Vote.None)
+				if (_participantContext.getDecision() == Decision.Commit)
 				{
-					_participantContext.getParticipant(m_node.addr).setVote(Vote.No);
-					_participantContext.getParticipant(m_node.addr).setDecision(Decision.Abort);
-					saveContext(_participantContext);
-					
-					abortOrCommit(_participantContext, true);
+					m_node.info("2pc recovery: participant re-processing transaction commit: " + _participantContext.getId().toString());
+					abortOrCommit(_participantContext, false /* commit */);
 				}
-				else
+				else if (_participantContext.getDecision() == Decision.Abort)
 				{
-					startTerminationProtocol(_participantContext.getId());
+					m_node.info("2pc recovery: participant re-processing transaction abort: " + _participantContext.getId().toString());
+					abortOrCommit(_participantContext, true /* abort */);
+				}
+				else	
+				{
+					Vote vote = _participantContext.getParticipant(m_node.addr).getVote();
+					if (vote == Vote.No || vote == Vote.None)
+					{
+						m_node.info("2pc recovery: participant unilaterally aborting transaction: " + _participantContext.getId().toString());
+						_participantContext.getParticipant(m_node.addr).setVote(Vote.No);
+						_participantContext.getParticipant(m_node.addr).setDecision(Decision.Abort);
+						saveContext(_participantContext);
+						
+						abortOrCommit(_participantContext, true /* abort */);
+					}
+					else
+					{
+						m_node.info("2pc recovery: participant voted yes - running termination protocol: " + _participantContext.getId().toString());
+						startTerminationProtocol(_participantContext.getId());
+						running2pcTermination = true;
+					}
 				}
 			}
+		}
+
+		if (!running2pcTermination) {
+			m_node.info("2pc recovery complete");
+		} else {
+			m_node.info("BLOCKED: 2pc recovery won't be complete until the termination protocol concludes");
 		}
 	}
 	
@@ -480,16 +507,13 @@ public class TwoPhaseCommit implements I2pcCoordinator, I2pcParticipant, I2pcCoo
 	}
 			
 	private void saveContext(TwoPhaseCommitContext context) {		
-		// Don't append to the log if in recovery mode
-		if (!m_inRecovery) {
-			try {
-				String fileName = context == _participantContext ? PARTICIPANT_FILENAME : "2pc-" + context.getId();
-				PersistentStorageWriter psw = m_node.getWriter(fileName, false);
-				psw.write(context.serialize());
-				psw.close();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
+		try {
+			String fileName = context == _participantContext ? PARTICIPANT_FILENAME : "2pc-" + context.getId();
+			PersistentStorageWriter psw = m_node.getWriter(fileName, false);
+			psw.write(context.serialize());
+			psw.close();
+		} catch (IOException e) {
+			e.printStackTrace();
 		}
 	}
 	
@@ -606,7 +630,7 @@ public class TwoPhaseCommit implements I2pcCoordinator, I2pcParticipant, I2pcCoo
 			_participantContext.setDecision(Decision.Abort);
 			saveContext(_participantContext);
 			
-			abortOrCommit(_participantContext, true);
+			abortOrCommit(_participantContext, true /* abort */);
 			
 			return Vote.No.toString();
 		}		
@@ -633,17 +657,17 @@ public class TwoPhaseCommit implements I2pcCoordinator, I2pcParticipant, I2pcCoo
 		
 		if (_participantContext == null) 
 		{
-			m_node.error("receiveCommit: this node is not participanting in a transaction as a particiapnt.");
+			m_node.error("commitTransaction: this node is not participanting in a transaction as a particiapnt.");
 			return null;
 		}
 		
 		if (_participantContext.getId().compareTo(twoPhaseCommitContextId) != 0)
 		{
-			m_node.error("receiveCommit: this node is not participanting in this transaction as a particiapnt.");
+			m_node.error("commitTransaction: this node is not participanting in this transaction as a particiapnt.");
 			return null;
 		}
 		
-		abortOrCommit(_participantContext, false);
+		abortOrCommit(_participantContext, false /* commit */);
 		return null;
 	}
 	
@@ -660,17 +684,17 @@ public class TwoPhaseCommit implements I2pcCoordinator, I2pcParticipant, I2pcCoo
 		
 		if (_participantContext == null) 
 		{
-			m_node.error("receiveAbort: this node is not participanting in a transaction as a particiapnt.");
+			m_node.error("abortTransaction: this node is not participanting in a transaction as a particiapnt.");
 			return null;
 		}
 		
 		if (_participantContext.getId().compareTo(twoPhaseCommitContextId) != 0)
 		{
-			m_node.error("receiveAbort: this node is not participanting in this transaction as a particiapnt.");
+			m_node.error("abortTransaction: this node is not participanting in this transaction as a particiapnt.");
 			return null;
 		}
 		
-		abortOrCommit(_participantContext, true);
+		abortOrCommit(_participantContext, true /* abort */);
 		return null;
 	}
 	
@@ -800,7 +824,7 @@ public class TwoPhaseCommit implements I2pcCoordinator, I2pcParticipant, I2pcCoo
 		TwoPhaseCommitContext context = _twoPhaseCommitContexts.get(twoPhaseCommitContextId);
 		if (context == null) 
 		{
-			m_node.error("receiveVote: context not found.");
+			m_node.error("reply_requestPrepare: context not found.");
 			return;
 		}
 		
@@ -819,13 +843,13 @@ public class TwoPhaseCommit implements I2pcCoordinator, I2pcParticipant, I2pcCoo
 			}
 			else
 			{
-				m_node.error("receiveVote: Unknown vote type");
+				m_node.error("reply_requestPrepare: Unknown vote type");
 				return;
 			}
 		}
 		else
 		{
-			m_node.warn("receiveVote: already received vote for participant.");
+			m_node.warn("reply_requestPrepare: already received vote for participant.");
 		}
 		
 		switch(context.getDecisionBasedOnVotes())
@@ -839,7 +863,7 @@ public class TwoPhaseCommit implements I2pcCoordinator, I2pcParticipant, I2pcCoo
 				break;
 				
 			default:
-				m_node.info("receiveVote: haven't decided yet.");
+				m_node.info("reply_requestPrepare: haven't decided yet.");
 				break;
 		}		
 	}
