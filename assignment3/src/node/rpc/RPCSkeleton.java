@@ -1,7 +1,5 @@
 package node.rpc;
 import java.util.Vector;
-import node.facebook.FacebookException;
-
 
 public abstract class RPCSkeleton  
 {
@@ -19,11 +17,6 @@ public abstract class RPCSkeleton
 			methodArgs.remove(0);
 			result.content = invokeInternal(methodName, methodArgs);
 			result.error = 0;
-		}
-		catch (FacebookException fbex)
-		{
-			result.error = fbex.getExceptionCode();
-			result.content = fbex.getReplyMessage();
 		}
 		catch (Exception ex)
 		{

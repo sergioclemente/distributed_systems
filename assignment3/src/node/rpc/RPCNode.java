@@ -4,7 +4,6 @@ import java.util.LinkedList;
 import java.util.Queue;
 import java.util.UUID;
 import java.util.Vector;
-import node.facebook.FacebookException;
 import node.reliable.ReliableDeliveryNode;
 import edu.washington.cs.cse490h.lib.Utility;
 
@@ -168,8 +167,10 @@ public class RPCNode extends ReliableDeliveryNode
 			// Fake a failed reply.
 			
 			Vector<String> replyArgs = new Vector<String>();
-			replyArgs.add(methodCall.getParams().get(0)); 
-			replyArgs.add(((Integer) FacebookException.CONNECTION_ABORTED).toString());
+			replyArgs.add(methodCall.getParams().get(0));
+			
+			// TODO: using 1 here, should use an error code that comes from elsewhere
+			replyArgs.add("1");
 			replyArgs.add("<null>");
 			
 			onMethodCalled(endpoint, "reply_" + methodCall.getMethodName(), replyArgs);
@@ -246,52 +247,6 @@ public class RPCNode extends ReliableDeliveryNode
 		mi.methodName = methodName;
 				
 		m_methods.put(methodName, mi);
-	}
-
-	
-	/**
-	 * connectToFacebookServer()
-	 * @param address
-	 * @param callbacks
-	 * @return
-	 */
-	public IFacebookServer connectToFacebookServer(int address, IFacebookServerReply callbacks)
-	{
-		return new Stub_FacebookServer(this, address, callbacks);
-	}
-
-		
-	public I2pcCoordinator connectTo2pcCoordinator(int address, I2pcCoordinatorReply callbacks)
-	{
-		return new Stub_2pcCoordinator(this, address, callbacks);
-	}
-
-	public I2pcParticipant connectTo2pcParticipant(int address, I2pcParticipantReply callbacks)
-	{
-		return new Stub_2pcParticipant(this, address, callbacks);
-	}
-
-	
-	/**
-	 * bindFacebookServerImpl
-	 * @param impl
-	 */
-	public void bindFacebookServerImpl(IFacebookServer impl)
-	{
-		Skel_FacebookServer skeleton = new Skel_FacebookServer(impl);
-		skeleton.BindMethods(this);
-	}
-	
-	public void bind2pcCoordinatorImpl(I2pcCoordinator impl)
-	{
-		Skel_2pcCoordinator skeleton = new Skel_2pcCoordinator(impl);
-		skeleton.BindMethods(this);
-	}
-	
-	public void bind2pcParticipantImpl(I2pcParticipant impl)
-	{
-		Skel_2pcParticipant skeleton = new Skel_2pcParticipant(impl);
-		skeleton.BindMethods(this);
 	}
 }
 
