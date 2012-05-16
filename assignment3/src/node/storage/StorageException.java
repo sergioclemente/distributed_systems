@@ -9,8 +9,8 @@ public class StorageException extends RPCException {
 	
 	private static final long serialVersionUID = 1773217326946381591L;
 
-	public StorageException(int exceptionCode) {
-		super(exceptionCode);
+	public StorageException(int exceptionCode, String replyMessage) {
+		super(exceptionCode, replyMessage);
 	}
 
 }

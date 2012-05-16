@@ -22,31 +22,29 @@ public class Skel_StorageServer extends RPCSkeleton
 	{
 		String content = null;
 		
-		switch (methodName)
+		if (methodName.compareToIgnoreCase("createFile") == 0)
 		{
-		case "createFile":
 			content = m_impl.createFile(methodArgs.get(0));
-			break;
-			
-		case "getFile":
+		}
+		else if (methodName.compareToIgnoreCase("getFile") == 0)
+		{
 			content = m_impl.getFile(methodArgs.get(0));
-			break;
-			
-		case "putFile":
+		}
+		else if (methodName.compareToIgnoreCase("putFile") == 0)
+		{
 			content = m_impl.putFile(methodArgs.get(0), methodArgs.get(1));
-			break;
-			
-		case "appendToFile":
+		}
+		else if (methodName.compareToIgnoreCase("appendToFile") == 0)
+		{
 			content = m_impl.appendToFile(methodArgs.get(0), methodArgs.get(1));
-			break;
-			
-		case "deleteFile":
+		}
+		else if (methodName.compareToIgnoreCase("deleteFile") == 0)
+		{
 			content = m_impl.deleteFile(methodArgs.get(0));
-			break;
-
-		default:
+		}
+		else 
+		{
 			assert false;
-			break;
 		}
 		
 		return content;

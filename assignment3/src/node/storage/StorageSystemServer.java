@@ -42,7 +42,7 @@ public class StorageSystemServer implements IStorageServer
 	{		
 		if (Utility.fileExists(m_node, fileName))
 		{				
-			throw new RPCException(FILE_ALREADY_EXISTS);
+			throw new RPCException(FILE_ALREADY_EXISTS, null);
 		}
 
 		try 
@@ -52,7 +52,7 @@ public class StorageSystemServer implements IStorageServer
 		} 
 		catch (IOException e) 
 		{
-			throw new RPCException(IO_EXCEPTION);
+			throw new RPCException(IO_EXCEPTION, null);
 		}
 	}
 	
@@ -64,7 +64,7 @@ public class StorageSystemServer implements IStorageServer
 	{
 		if (!Utility.fileExists(m_node, fileName))
 		{
-			throw new RPCException(FILE_DOES_NOT_EXIST);
+			throw new RPCException(FILE_DOES_NOT_EXIST, null);
 		}
 
 		try
@@ -74,7 +74,7 @@ public class StorageSystemServer implements IStorageServer
 		}
 		catch (IOException e) 
 		{
-			throw new RPCException(IO_EXCEPTION);
+			throw new RPCException(IO_EXCEPTION, null);
 		}
 	}	
 	
@@ -87,19 +87,19 @@ public class StorageSystemServer implements IStorageServer
 	{
 		if (!Utility.fileExists(m_node, fileName))
 		{
-			throw new RPCException(FILE_DOES_NOT_EXIST);
+			throw new RPCException(FILE_DOES_NOT_EXIST, null);
 		}
 		
 		if (contents.getBytes().length > MAX_MESSAGE_SIZE)
 		{
-			throw new RPCException(FILE_TOO_LARGE);
+			throw new RPCException(FILE_TOO_LARGE, null);
 		}
 		
 		try {
 			updateFileContents(fileName, contents, false);
 			return null;
 		} catch (IOException e) {
-			throw new RPCException(IO_EXCEPTION);
+			throw new RPCException(IO_EXCEPTION, null);
 		}
 	}
 	
@@ -113,18 +113,18 @@ public class StorageSystemServer implements IStorageServer
 		try {						
 			if (!Utility.fileExists(m_node, fileName))
 			{
-				throw new RPCException(FILE_DOES_NOT_EXIST);
+				throw new RPCException(FILE_DOES_NOT_EXIST, null);
 			}
 			
 			if (readFileContents(fileName).getBytes().length > MAX_MESSAGE_SIZE)
 			{
-				throw new RPCException(FILE_TOO_LARGE);
+				throw new RPCException(FILE_TOO_LARGE, null);
 			}
 			
 			updateFileContents(fileName, contents, true);			
 			return null;
 		} catch (IOException e) {
-			throw new RPCException(IO_EXCEPTION);
+			throw new RPCException(IO_EXCEPTION, null);
 		}
 	}
 
@@ -136,7 +136,7 @@ public class StorageSystemServer implements IStorageServer
 	{
 		if (!Utility.fileExists(m_node, fileName))
 		{
-			throw new RPCException(FILE_DOES_NOT_EXIST);
+			throw new RPCException(FILE_DOES_NOT_EXIST, null);
 		}
 		
 		try {
@@ -144,7 +144,7 @@ public class StorageSystemServer implements IStorageServer
 			writer.delete();
 			return null;
 		} catch (IOException e) {
-			throw new RPCException(IO_EXCEPTION);
+			throw new RPCException(IO_EXCEPTION, null);
 		}
 	}
 	

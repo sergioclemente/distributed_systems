@@ -43,31 +43,29 @@ public class Stub_StorageServer extends RPCStub implements IStorageServer
 	@Override
 	protected void dispatchReply(int replyId, String methodName, int sender, int result, String content)
 	{
-		switch (methodName)
+		if (methodName.compareToIgnoreCase("createFile") == 0)
 		{
-		case "createFile":
 			m_callback.reply_createFile(replyId, sender, result, content);
-			break;
-			
-		case "getFile":
+		}
+		else if (methodName.compareToIgnoreCase("getFile") == 0)
+		{
 			m_callback.reply_getFile(replyId, sender, result, content);
-			break;
-			
-		case "putFile":
+		}
+		else if (methodName.compareToIgnoreCase("putFile") == 0)
+		{
 			m_callback.reply_putFile(replyId, sender, result, content);
-			break;
-
-		case "appendToFile":
+		}
+		else if (methodName.compareToIgnoreCase("appendToFile") == 0)
+		{
 			m_callback.reply_appendToFile(replyId, sender, result, content);
-			break;
-			
-		case "deleteFile":
+		}
+		else if (methodName.compareToIgnoreCase("deleteFile") == 0)
+		{
 			m_callback.reply_deleteFile(replyId, sender, result, content);
-			break;
-			
-		default:
+		}
+		else 
+		{
 			m_node.error("Unexpected method reply: " + methodName);
-			break;
 		}
 	}
 
