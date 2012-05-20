@@ -4,14 +4,14 @@ import java.util.Vector;
 
 import util.SerializationUtil;
 
-public class ProposedValues {
-	private Vector<ProposedValue> values;
+public class AcceptedValues {
+	private Vector<AcceptedValue> values;
 	
-	public ProposedValues() {
-		this.values = new Vector<ProposedValue>();
+	public AcceptedValues() {
+		this.values = new Vector<AcceptedValue>();
 	}
 	
-	public void setAt(int slotNumber, ProposedValue value) {
+	public void setAt(int slotNumber, AcceptedValue value) {
 		if (value == null) {
 			throw new PaxosException(PaxosException.VALUE_IS_NULL);
 		}
@@ -19,7 +19,7 @@ public class ProposedValues {
 			throw new PaxosException(PaxosException.CONTENT_IS_NULL);
 		}
 		
-		ProposedValue previousValue = this.getAt(slotNumber);
+		AcceptedValue previousValue = this.getAt(slotNumber);
 		
 		if (previousValue != null) {
 //			P2a. If a proposal with value v is chosen, 
@@ -41,7 +41,7 @@ public class ProposedValues {
 		this.values.add(slotNumber, value);
 	}
 	
-	public ProposedValue getAt(int slotNumber) {
+	public AcceptedValue getAt(int slotNumber) {
 		if (slotNumber < 0 || slotNumber >= this.values.size()) {
 			return null;
 		}

@@ -126,9 +126,9 @@ public class PaxosMainTests {
 	}
 	
 	private static void valueTests() {
-		ProposedValues values = new ProposedValues();
+		AcceptedValues values = new AcceptedValues();
 		Assert.isNull(values.getAt(0));
-		values.setAt(0, new ProposedValue(0, "abc", new PrepareNumber((byte)1,2)));
+		values.setAt(0, new AcceptedValue(0, "abc", new PrepareNumber((byte)1,2)));
 		Assert.equals("abc", values.getAt(0).getContent());
 		print("valueTests Passed!");
 	}
