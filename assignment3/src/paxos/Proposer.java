@@ -48,7 +48,7 @@ public class Proposer {
 	}
 	
 	public boolean processPrepareResponse(PrepareResponse prepareResponse) {
-		int slotNumber = prepareResponse.getSlotNumber();
+		int slotNumber = prepareResponse.getPrepareRequest().getSlotNumber();
 		
 		if (!this.responses.containsKey(slotNumber)) {
 			// Should have set the map to a non null value
@@ -60,7 +60,7 @@ public class Proposer {
 		prepareState.addPrepareResponse(prepareResponse);
 		
 		// Update the prepare to max
-		this.currentPrepareNumber.setSequenceNumber(prepareResponse.getMaxNumberAcceptedSoFar().getSequenceNumber());
+		this.currentPrepareNumber.setSequenceNumber(prepareResponse.getMaxNumberPreparedSoFar().getSequenceNumber());
 		
 		return canProposeValue(prepareState);
 	}
@@ -92,7 +92,7 @@ public class Proposer {
 		PrepareNumber prepareNumber = proposalState.getPrepareRequest().getNumber();
 		
 		for (PrepareResponse prepareResponse : proposalState.getProposalResponses()) {
-			if (prepareNumber.compareTo(prepareResponse.getMaxNumberAcceptedSoFar()) > 0) {
+			if (prepareNumber.compareTo(prepareResponse.getMaxNumberPreparedSoFar()) > 0) {
 				acceptCount++;
 			}
 		}

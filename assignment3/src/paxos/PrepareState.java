@@ -33,7 +33,7 @@ public class PrepareState {
 			// Already received response from this node
 			throw new PaxosException(PaxosException.ALREADY_RECEIVED_RESPONSE_FROM_THIS_ACCEPTOR);
 		} else {
-			if (prepareResponse.getRequestNumber().getValue() != this.prepareRequest.getNumber().getValue()) {
+			if (prepareResponse.getPrepareRequest().getNumber().getValue() != this.prepareRequest.getNumber().getValue()) {
 				throw new PaxosException(PaxosException.REQUEST_NUMBER_DIDNT_MATCH);
 			}
 			
