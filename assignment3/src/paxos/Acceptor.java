@@ -38,19 +38,14 @@ public class Acceptor {
 	public AcceptResponse processAccept(AcceptRequest acceptRequest) {
 		PrepareRequest prepareRequest = acceptRequest.getPrepareRequest();
 		
-		boolean success;
-		
 		if (prepareRequest.getNumber().getValue() >= this.maxNumberPrepared.getValue()) {
 			this.proposedValues.setAt(prepareRequest.getSlotNumber(), new AcceptedValue(prepareRequest.getSlotNumber(), acceptRequest.getValue(), prepareRequest.getNumber()));
 			
 			if (this.serialization != null) {
 				this.serialization.saveState("proposedValues", this.proposedValues);
 			}
-			success = true;
-		} else {
-			success = false;
 		}
 		
-		return new AcceptResponse(prepareRequest, this.maxNumberPrepared.clone(), success);
+		return new AcceptResponse(prepareRequest, this.maxNumberPrepared.clone());
 	}
 }

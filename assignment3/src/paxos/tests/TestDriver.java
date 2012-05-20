@@ -49,11 +49,13 @@ public class TestDriver {
 		Proposer proposer = this.proposers.get(proposeServer);
 		
 		AcceptRequest request = proposer.createAcceptRequest(slotNumber, value);
-
+		
+		long prepareNumberValue = request.getPrepareRequest().getNumber().getValue();
+		
 		boolean accepted = true;
 		for (Acceptor acceptor : this.acceptors) {
 			AcceptResponse acceptResponse = acceptor.processAccept(request);
-			accepted = accepted && acceptResponse.getSuccess();
+			accepted = accepted && acceptResponse.getMaxNumberPreparedSoFar().getValue() == prepareNumberValue;
 			proposer.processAcceptResponse(acceptResponse);
 		}
 		
