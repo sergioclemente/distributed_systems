@@ -18,6 +18,7 @@ public class PaxosException extends RuntimeException {
 	public static final int REQUEST_NUMBER_DIDNT_MATCH = 8;
 	public static final int CANNOT_CREATE_PREPARE_REQUEST_WITHOUT_PENDING_RESPONSES = 9;
 	public static final int CANNOT_CREATE_PREPARE_RESEND_WITHOUT_PENDING_RESPONSES = 10;
+	public static final int CANNOT_CREATE_ACCEPT_REQUEST = 11;
 	
 	private int errorCode;
 	public PaxosException(int errorCode) {
@@ -56,6 +57,8 @@ public class PaxosException extends RuntimeException {
 				return "Cannot create prepare request without pending responses";
 			case CANNOT_CREATE_PREPARE_RESEND_WITHOUT_PENDING_RESPONSES:
 				return "Cannot create resend without pending responses";
+			case CANNOT_CREATE_ACCEPT_REQUEST:
+				return "Cannot create accept request";
 			default:
 				return "unknown";
 		}

@@ -6,16 +6,16 @@ import com.google.gson.internal.Pair;
 
 public class Proposer {
 	private PrepareNumber currentPrepareNumber;
-	private byte[] acceptorsHostIdentifiers;
+	private int numberOfAcceptors;
 	
 	// Map from: Slot Number (Index) --> Host Identifier --> PrepareResponse
 	// That is used when the value is not chosen yet
 	private Hashtable<Integer, PrepareState> responses;
 	
-	public Proposer(byte hostIdentifier, byte[] acceptorsHostIdentifiers) {
+	public Proposer(byte hostIdentifier, int numberOfAcceptors) {
 		this.responses = new Hashtable<Integer, PrepareState>();
 		this.currentPrepareNumber = new PrepareNumber(hostIdentifier, 0);
-		this.acceptorsHostIdentifiers = acceptorsHostIdentifiers;
+		this.numberOfAcceptors = numberOfAcceptors;
 	}
 	
 	// Prepare
@@ -27,7 +27,7 @@ public class Proposer {
 		return this.internalCreatePrepareRequest(slotNumber);
 	}
 	
-	public PrepareRequest createPrepareRequestResend(int slotNumber) {
+	public PrepareRequest createRePrepareRequest(int slotNumber) {
 		// Check first if we have an outstanding prepare request
 		if (!this.responses.containsKey(slotNumber)) {
 			throw new PaxosException(PaxosException.CANNOT_CREATE_PREPARE_RESEND_WITHOUT_PENDING_RESPONSES);
@@ -67,18 +67,18 @@ public class Proposer {
 
 	private boolean canProposeValue(PrepareState proposalState) {
 		// Goes through the PrepareResponses
-		int majority = this.acceptorsHostIdentifiers.length/2 + 1;
+		int majority = this.numberOfAcceptors/2 + 1;
 
 		return getAcceptCount(proposalState) >= majority;
 	}
 	
 	public boolean shouldResendPrepareRequest(PrepareRequest prepareRequest) {
-		int majority = this.acceptorsHostIdentifiers.length/2 + 1;
+		int majority = this.numberOfAcceptors/2 + 1;
 		PrepareState state = this.responses.get(prepareRequest.getSlotNumber());
 		 
 		int acceptCount = this.getAcceptCount(state);
 		int totalCount = this.getTotal(state);
-		int remaining = this.acceptorsHostIdentifiers.length - totalCount;
+		int remaining = this.numberOfAcceptors - totalCount;
 		
 		// Should we should the prepare when the number of acceptors + remaining
 		// can never be a majority
@@ -101,14 +101,24 @@ public class Proposer {
 	}
 	
 	// TODO: I don't like the name of this function, think in a better name
-	private int getTotal(PrepareState proposalState) {
+	private int getTotal(PrepareState prepareState) {
 		int totalCount = 0;
-		PrepareNumber prepareNumber = proposalState.getPrepareRequest().getNumber();
+		PrepareNumber prepareNumber = prepareState.getPrepareRequest().getNumber();
 		
-		for (PrepareResponse prepareResponse : proposalState.getProposalResponses()) {
+		for (PrepareResponse prepareResponse : prepareState.getProposalResponses()) {
 			totalCount++;
 		}
 		
 		return totalCount;
+	}
+
+	public AcceptRequest createAcceptRequest(int slotNumber, Object value) {
+		PrepareState prepareState = this.responses.get(slotNumber);
+		
+		if (this.canProposeValue(prepareState)) {
+			return new AcceptRequest(prepareState.getPrepareRequest(), value);			
+		} else {
+			throw new PaxosException(PaxosException.CANNOT_CREATE_ACCEPT_REQUEST);
+		}
 	}
 }

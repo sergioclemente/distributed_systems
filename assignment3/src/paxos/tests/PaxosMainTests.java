@@ -4,18 +4,46 @@ import paxos.*;
 
 public class PaxosMainTests {
 	public static void main(String[] args) {
-		valueTests();
-		proposalNumberTests();
-		createPrepareRequestTests();
-		processPrepareResponseSunnyPathTests();
-		processPrepareResponseRainyPathTests();
-		processPrepareResponseResendPrepare();
+		valueTest();
+		proposalNumberTest();
+		createPrepareRequestTest();
+		processPrepareResponseSunnyPathTest();
+		processPrepareResponseRainyPathTest();
+		processPrepareResponseResendPrepareTest();
+		processPrepareAcceptSunnyTests();
+		processPrepareAcceptRejectTest();
+		processPrepareAcceptRePrepareTest();
+	}
+
+	private static void processPrepareAcceptRePrepareTest() {
+		TestDriver driver = new TestDriver(5,5);
+		driver.prepare(0, 0);
+		driver.prepare(1, 0);
+		Assert.isFalse(driver.accept(0, 0, "foo"));
+		driver.rePrepare(0, 0); // It will receive the new number of the proposer
+		driver.rePrepare(0, 0);
+		Assert.isTrue(driver.accept(0, 0, "foo"));
+		print("processPrepareAcceptRePrepareTest Passed!");
+	}
+
+	private static void processPrepareAcceptRejectTest() {
+		TestDriver driver = new TestDriver(5,5);
+		driver.prepare(0, 0);
+		driver.prepare(1, 0);
+		Assert.isFalse(driver.accept(0, 0, "foo"));
+		print("processPrepareAcceptRejectTest Passed!");
 	}
 	
-	private static void createPrepareRequestTests() {
-		byte[] acceptorsHosts = {1,2,3,4};
+	private static void processPrepareAcceptSunnyTests() {
+		TestDriver driver = new TestDriver(5,5);
+		driver.prepare(0, 0);
+		Assert.isTrue(driver.accept(0, 0, "foo"));
+		print("processPrepareAcceptSunnyTests Passed!");
+	}
+
+	private static void createPrepareRequestTest() {
 		byte hostIdentifier = 0;
-		Proposer proposer = new Proposer(hostIdentifier, acceptorsHosts);
+		Proposer proposer = new Proposer(hostIdentifier, 4);
 		
 		PrepareRequest prepareRequestSlot0 = proposer.createPrepareRequest(0);
 		PrepareNumber prepareNumberSlot0 = prepareRequestSlot0.getNumber();
@@ -37,13 +65,12 @@ public class PaxosMainTests {
 		Assert.equals(hostIdentifier, prepareNumberSlot1.getHostIdentifier());
 		
 		Assert.isTrue(prepareNumberSlot0.getSequenceNumber() < prepareNumberSlot1.getSequenceNumber());
-		print("createPrepareRequestTests Passed!");
+		print("createPrepareRequestTest Passed!");
 	}
 	
-	private static void processPrepareResponseSunnyPathTests() {
-		byte[] acceptorsHosts = {1,2,3,4};
+	private static void processPrepareResponseSunnyPathTest() {
 		byte hostIdentifier = 0;
-		Proposer proposer = new Proposer(hostIdentifier, acceptorsHosts);
+		Proposer proposer = new Proposer(hostIdentifier, 4);
 		
 		PrepareRequest prepareRequest = proposer.createPrepareRequest(0);
 		
@@ -58,13 +85,12 @@ public class PaxosMainTests {
 		Assert.isTrue(proposer.processPrepareResponse(response3));
 		Assert.isTrue(proposer.processPrepareResponse(response4));
 		
-		print("processPrepareResponseSunnyPathTests Passed!");
+		print("processPrepareResponseSunnyPathTest Passed!");
 	}
 	
-	private static void processPrepareResponseRainyPathTests() {
-		byte[] acceptorsHosts = {1,2,3,4};
+	private static void processPrepareResponseRainyPathTest() {
 		byte hostIdentifier = 0;
-		Proposer proposer = new Proposer(hostIdentifier, acceptorsHosts);
+		Proposer proposer = new Proposer(hostIdentifier, 4);
 		
 		PrepareRequest prepareRequest = proposer.createPrepareRequest(0);
 		
@@ -79,13 +105,12 @@ public class PaxosMainTests {
 		Assert.isFalse(proposer.processPrepareResponse(response3));
 		Assert.isFalse(proposer.processPrepareResponse(response4));
 		
-		print("processPrepareResponseRainyPathTests Passed!");
+		print("processPrepareResponseRainyPathTest Passed!");
 	}
 	
-	private static void processPrepareResponseResendPrepare() {
-		byte[] acceptorsHosts = {1,2,3,4};
+	private static void processPrepareResponseResendPrepareTest() {
 		byte hostIdentifier = 0;
-		Proposer proposer = new Proposer(hostIdentifier, acceptorsHosts);
+		Proposer proposer = new Proposer(hostIdentifier, 4);
 		
 		PrepareRequest prepareRequest = proposer.createPrepareRequest(0);
 		
@@ -101,7 +126,7 @@ public class PaxosMainTests {
 		Assert.isFalse(proposer.processPrepareResponse(response4));
 		
 		Assert.isTrue(proposer.shouldResendPrepareRequest(prepareRequest));
-		PrepareRequest prepareRequestResend = proposer.createPrepareRequestResend(0);
+		PrepareRequest prepareRequestResend = proposer.createRePrepareRequest(0);
 		PrepareResponse responseResend1 = new PrepareResponse((byte)1,prepareRequestResend,new PrepareNumber((byte)1,0));
 		PrepareResponse responseResend2 = new PrepareResponse((byte)2,prepareRequestResend,new PrepareNumber((byte)2,0));
 		PrepareResponse responseResend3 = new PrepareResponse((byte)3,prepareRequestResend,new PrepareNumber((byte)3,2));
@@ -112,30 +137,28 @@ public class PaxosMainTests {
 		Assert.isTrue(proposer.processPrepareResponse(responseResend3));
 		Assert.isTrue(proposer.processPrepareResponse(responseResend4));
 		
-		print("processPrepareResponseResendPrepare Passed!");
+		print("processPrepareResponseResendPrepareTest Passed!");
 	}
 
-	private static void proposalNumberTests() {
+	private static void proposalNumberTest() {
 		PrepareNumber p = new PrepareNumber((byte) 1, 2);
 		Assert.equals(1, p.getHostIdentifier());
 		Assert.equals(2, p.getSequenceNumber());
 		p.setSequenceNumber(123);
 		Assert.equals(1, p.getHostIdentifier());
 		Assert.equals(123, p.getSequenceNumber());		
-		print("proposalNumberTests Passed!");
+		print("proposalNumberTest Passed!");
 	}
 	
-	private static void valueTests() {
+	private static void valueTest() {
 		AcceptedValues values = new AcceptedValues();
 		Assert.isNull(values.getAt(0));
 		values.setAt(0, new AcceptedValue(0, "abc", new PrepareNumber((byte)1,2)));
 		Assert.equals("abc", values.getAt(0).getContent());
-		print("valueTests Passed!");
+		print("valueTest Passed!");
 	}
 	
 	private static void print(String msg) {
 		System.out.println(msg);
 	}
-	
-
 }

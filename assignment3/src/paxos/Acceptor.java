@@ -1,6 +1,5 @@
 package paxos;
 
-// This is a mockup acceptor class. i didn't verified the logic with tests yet
 public class Acceptor {
 	private byte hostIdentifier;
 	private PrepareNumber maxNumberPrepared;
