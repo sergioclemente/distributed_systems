@@ -1,24 +1,41 @@
 package paxos;
 
+import util.SerializationUtil;
+
 public class ProposedValue {
-	private ProposalNumber number;
-	private Object value;
+	private int slotNumber;
+	private Object content;
+	private PrepareNumber number;
 	
-	public ProposedValue(ProposalNumber number, Object value) {
+	public ProposedValue(int slotNumber, Object content, PrepareNumber number) {
+		this.setSlotNumber(slotNumber);
 		this.number = number;
-		this.value = value;
+		this.content = content;
 	}
 	
-	public ProposalNumber getNumber() {
+	public PrepareNumber getNumber() {
 		return number;
 	}
-	public void setNumber(ProposalNumber number) {
+	public void setNumber(PrepareNumber number) {
 		this.number = number;
 	}
-	public Object getValue() {
-		return value;
+	public Object getContent() {
+		return content;
 	}
-	public void setValue(Object value) {
-		this.value = value;
+	public void setContent(Object content) {
+		this.content = content;
+	}
+
+	public int getSlotNumber() {
+		return slotNumber;
+	}
+
+	public void setSlotNumber(int slotNumber) {
+		this.slotNumber = slotNumber;
+	}
+	
+	@Override
+	public String toString() {
+		return SerializationUtil.serialize(this);
 	}
 }
