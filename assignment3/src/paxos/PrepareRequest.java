@@ -1,8 +1,5 @@
 package paxos;
 
-
-import edu.washington.cs.cse490h.lib.Utility;
-import util.RandomUtils;
 import util.SerializationUtil;
 
 public class PrepareRequest {

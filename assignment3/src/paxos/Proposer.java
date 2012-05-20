@@ -30,7 +30,7 @@ public class Proposer {
 	public PrepareRequest createPrepareRequestResend(int slotNumber) {
 		// Check first if we have an outstanding prepare request
 		if (!this.responses.containsKey(slotNumber)) {
-			throw new PaxosException(PaxosException.CANNOT_CREATE_PREPARE_REQUEST_WITHOUT_PENDING_RESPONSES);
+			throw new PaxosException(PaxosException.CANNOT_CREATE_PREPARE_RESEND_WITHOUT_PENDING_RESPONSES);
 		}
 		return this.internalCreatePrepareRequest(slotNumber);		
 	}

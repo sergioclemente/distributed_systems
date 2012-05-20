@@ -3,19 +3,18 @@ package paxos;
 import util.SerializationUtil;
 
 public class PrepareResponse {
+	private byte hostIdentifier;
 	private int slotNumber;
 	private PrepareNumber requestNumber;
 	private PrepareNumber maxNumberAcceptedSoFar;
-	private byte hostIdentifier;
 
 	
-	public PrepareResponse(int slotNumber, PrepareNumber requestNumber, PrepareNumber maxNumberAcceptedSoFar, byte hostIdentifier) {
+	public PrepareResponse(byte hostIdentifier, int slotNumber, PrepareNumber requestNumber, PrepareNumber maxNumberAcceptedSoFar) {
 		this.slotNumber = slotNumber;
 		this.requestNumber = requestNumber;
 		this.maxNumberAcceptedSoFar = maxNumberAcceptedSoFar;
 		this.hostIdentifier = hostIdentifier;
 	}
-	
 
 	public int getSlotNumber() {
 		return slotNumber;
