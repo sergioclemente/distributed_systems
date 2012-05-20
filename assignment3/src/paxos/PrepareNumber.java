@@ -42,7 +42,7 @@ public class PrepareNumber implements  Comparable<PrepareNumber> {
 		} else {
 			if (this.getValue() > prepareNumber.getValue()) {
 				return +1;
-			} else if (this.getValue() < prepareNumber.getHostIdentifier()){
+			} else if (this.getValue() < prepareNumber.getValue()){
 				return -1;
 			} else {
 				return 0;

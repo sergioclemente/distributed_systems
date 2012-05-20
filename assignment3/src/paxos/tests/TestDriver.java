@@ -19,7 +19,7 @@ public class TestDriver {
 		}
 		
 		for (int i = 0; i< numberOfAcceptors; i++) {
-			this.acceptors.add(new Acceptor(hostIdentifier++));
+			this.acceptors.add(new Acceptor(hostIdentifier++, null));
 		}
 	}
 	
@@ -52,7 +52,9 @@ public class TestDriver {
 
 		boolean accepted = true;
 		for (Acceptor acceptor : this.acceptors) {
-			accepted = accepted && acceptor.processAccept(request);
+			AcceptResponse acceptResponse = acceptor.processAccept(request);
+			accepted = accepted && acceptResponse.getSuccess();
+			proposer.processAcceptResponse(acceptResponse);
 		}
 		
 		return accepted;

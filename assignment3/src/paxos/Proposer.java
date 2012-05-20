@@ -92,7 +92,7 @@ public class Proposer {
 		PrepareNumber prepareNumber = proposalState.getPrepareRequest().getNumber();
 		
 		for (PrepareResponse prepareResponse : proposalState.getProposalResponses()) {
-			if (prepareNumber.compareTo(prepareResponse.getMaxNumberPreparedSoFar()) > 0) {
+			if (prepareNumber.compareTo(prepareResponse.getMaxNumberPreparedSoFar()) >= 0) {
 				acceptCount++;
 			}
 		}
@@ -120,5 +120,10 @@ public class Proposer {
 		} else {
 			throw new PaxosException(PaxosException.CANNOT_CREATE_ACCEPT_REQUEST);
 		}
+	}
+	
+	public void processAcceptResponse(AcceptResponse acceptResponse) {
+		// Update the sequence number
+		this.currentPrepareNumber.setSequenceNumber(acceptResponse.getMaxNumberPreparedSoFar().getSequenceNumber()); 
 	}
 }
