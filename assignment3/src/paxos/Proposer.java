@@ -5,9 +5,7 @@ import java.util.Hashtable;
 import com.google.gson.internal.Pair;
 
 public class Proposer {
-	private ProposedValues proposedValues;
 	private PrepareNumber currentPrepareNumber;
-	private byte hostIdentifier;
 	private byte[] acceptorsHostIdentifiers;
 	
 	// Map from: Slot Number (Index) --> Host Identifier --> PrepareResponse
@@ -15,12 +13,8 @@ public class Proposer {
 	private Hashtable<Integer, PrepareState> responses;
 	
 	public Proposer(byte hostIdentifier, byte[] acceptorsHostIdentifiers) {
-		this.proposedValues = new ProposedValues();
 		this.responses = new Hashtable<Integer, PrepareState>();
 		this.currentPrepareNumber = new PrepareNumber(hostIdentifier, 0);
-		
-		
-		this.hostIdentifier = hostIdentifier;
 		this.acceptorsHostIdentifiers = acceptorsHostIdentifiers;
 	}
 	
