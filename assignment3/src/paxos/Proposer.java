@@ -92,7 +92,8 @@ public class Proposer {
 		PrepareNumber prepareNumber = proposalState.getPrepareRequest().getNumber();
 		
 		for (PrepareResponse prepareResponse : proposalState.getProposalResponses()) {
-			if (prepareNumber.compareTo(prepareResponse.getMaxNumberPreparedSoFar()) >= 0) {
+			if (prepareNumber.compareTo(prepareResponse.getMaxNumberPreparedSoFar()) >= 0
+					&& prepareResponse.getContent() == null) {
 				acceptCount++;
 			}
 		}
@@ -112,10 +113,29 @@ public class Proposer {
 		return totalCount;
 	}
 
+	
+	private Object getAnyAcceptedValue(PrepareState proposalState) {
+		PrepareNumber prepareNumber = proposalState.getPrepareRequest().getNumber();
+		
+		for (PrepareResponse prepareResponse : proposalState.getProposalResponses()) {
+			if (prepareResponse.getContent() != null) {
+				return prepareResponse.getContent();
+			}
+		}
+		
+		return null;
+	}
+	
 	public AcceptRequest createAcceptRequest(int slotNumber, Object value) {
 		PrepareState prepareState = this.responses.get(slotNumber);
 		
 		if (this.canProposeValue(prepareState)) {
+			// We cannot accept with a different value
+			Object alreadyAcceptedValue = this.getAnyAcceptedValue(prepareState);
+			if (alreadyAcceptedValue != null && !alreadyAcceptedValue.equals(value)) {
+				throw new PaxosException(PaxosException.CANNOT_ACCEPT_WITH_DIFFERENT_VALUE);
+			}
+
 			return new AcceptRequest(prepareState.getPrepareRequest(), value);			
 		} else {
 			throw new PaxosException(PaxosException.CANNOT_CREATE_ACCEPT_REQUEST);

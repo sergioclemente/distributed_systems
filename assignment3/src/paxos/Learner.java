@@ -10,6 +10,7 @@ public class Learner {
 	}
 	
 	public void processAcceptResponse(LearnRequest learnRequest) {
+		// TODO: Learner has to count the majority too 
 		this.learnedValues.setAt(learnRequest.getSlotNumber(), learnRequest.getLearnedValue());
 	}
 

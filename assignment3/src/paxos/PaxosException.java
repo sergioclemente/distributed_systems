@@ -20,6 +20,7 @@ public class PaxosException extends RuntimeException {
 	public static final int CANNOT_CREATE_PREPARE_RESEND_WITHOUT_PENDING_RESPONSES = 10;
 	public static final int CANNOT_CREATE_ACCEPT_REQUEST = 11;
 	public static final int VALUE_WAS_NOT_LEARNED = 12;
+	public static final int CANNOT_ACCEPT_WITH_DIFFERENT_VALUE = 13;
 	
 	private int errorCode;
 	public PaxosException(int errorCode) {
@@ -62,6 +63,8 @@ public class PaxosException extends RuntimeException {
 				return "Cannot create accept request";
 			case VALUE_WAS_NOT_LEARNED:
 				return "Value was not learned";
+			case CANNOT_ACCEPT_WITH_DIFFERENT_VALUE:
+				return "Cannot accept with different value";
 			default:
 				return "unknown";
 		}

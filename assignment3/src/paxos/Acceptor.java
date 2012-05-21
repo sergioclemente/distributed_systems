@@ -26,7 +26,10 @@ public class Acceptor {
 			this.maxNumberPrepared = prepareRequest.getNumber();
 		}
 
-		PrepareResponse prepareResponse = new PrepareResponse(this.hostIdentifier, prepareRequest, this.maxNumberPrepared.clone());
+		// Get any learned value (if any)
+		LearnedValue learnedValue = this.learnedValues.getAt(prepareRequest.getSlotNumber());
+		
+		PrepareResponse prepareResponse = new PrepareResponse(this.hostIdentifier, prepareRequest, this.maxNumberPrepared.clone(), learnedValue != null ? learnedValue.getContent() : null);
 		
 		if (this.serialization != null) {
 			this.serialization.saveState("maxNumberPrepared", this.maxNumberPrepared);
