@@ -2,12 +2,12 @@ package paxos;
 
 import util.SerializationUtil;
 
-public class AcceptedValue {
+public class LearnedValue {
 	private int slotNumber;
 	private Object content;
 	private PrepareNumber number;
 	
-	public AcceptedValue(int slotNumber, Object content, PrepareNumber number) {
+	public LearnedValue(int slotNumber, Object content, PrepareNumber number) {
 		this.setSlotNumber(slotNumber);
 		this.number = number;
 		this.content = content;

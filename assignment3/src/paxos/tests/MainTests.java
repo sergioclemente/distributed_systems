@@ -14,10 +14,22 @@ public class MainTests {
 		processPrepareAcceptRejectTest();
 		processPrepareAcceptRePrepareTest();
 		processPrepareRePrepareMultiTest();
+		processLearnTest();
+	}
+	
+	private static void processLearnTest() {
+		TestDriver driver = new TestDriver(5,5,5);
+		driver.prepare(0, 0);
+		Assert.isTrue(driver.accept(0, 0, "abc"));
+		Assert.isNull(driver.getLearnedValue(0, 0)); // Didn't learn yet
+		driver.learn(0, 0);
+		LearnedValue learnedValue = driver.getLearnedValue(0, 0);
+		Assert.isNotNull(learnedValue);
+		Assert.equals("abc", learnedValue.getContent());
 	}
 
 	private static void processPrepareRePrepareMultiTest() {
-		TestDriver driver = new TestDriver(5,5);
+		TestDriver driver = new TestDriver(5,5,5);
 		driver.prepare(0, 0);
 		driver.prepare(1, 0);
 		Assert.isFalse(driver.accept(0, 0, "foo"));
@@ -28,7 +40,7 @@ public class MainTests {
 	}
 	
 	private static void processPrepareAcceptRePrepareTest() {
-		TestDriver driver = new TestDriver(5,5);
+		TestDriver driver = new TestDriver(5,5,5);
 		driver.prepare(0, 0);
 		driver.prepare(1, 0);
 		Assert.isFalse(driver.accept(0, 0, "foo"));
@@ -38,7 +50,7 @@ public class MainTests {
 	}
 
 	private static void processPrepareAcceptRejectTest() {
-		TestDriver driver = new TestDriver(5,5);
+		TestDriver driver = new TestDriver(5,5,5);
 		driver.prepare(0, 0);
 		driver.prepare(1, 0);
 		Assert.isFalse(driver.accept(0, 0, "foo"));
@@ -46,7 +58,7 @@ public class MainTests {
 	}
 	
 	private static void processPrepareAcceptSunnyTests() {
-		TestDriver driver = new TestDriver(5,5);
+		TestDriver driver = new TestDriver(5,5,5);
 		driver.prepare(0, 0);
 		Assert.isTrue(driver.accept(0, 0, "foo"));
 		print("processPrepareAcceptSunnyTests Passed!");
@@ -162,9 +174,9 @@ public class MainTests {
 	}
 	
 	private static void valueTest() {
-		AcceptedValues values = new AcceptedValues();
+		LearnedValues values = new LearnedValues();
 		Assert.isNull(values.getAt(0));
-		values.setAt(0, new AcceptedValue(0, "abc", new PrepareNumber((byte)1,2)));
+		values.setAt(0, new LearnedValue(0, "abc", new PrepareNumber((byte)1,2)));
 		Assert.equals("abc", values.getAt(0).getContent());
 		print("valueTest Passed!");
 	}

@@ -5,7 +5,7 @@ import util.ISerialization;
 public class Acceptor {
 	private byte hostIdentifier;
 	private PrepareNumber maxNumberPrepared;
-	private AcceptedValues proposedValues;
+	private LearnedValues learnedValues;
 	private ISerialization serialization;
 	
 	public Acceptor(byte hostIdentifier, ISerialization serialization) {
@@ -14,10 +14,10 @@ public class Acceptor {
 		
 		if (this.serialization != null) {
 			this.maxNumberPrepared = (PrepareNumber)this.serialization.restoreState("maxNumberPrepared");
-			this.proposedValues = (AcceptedValues)this.serialization.restoreState("proposedValues");
+			this.learnedValues = (LearnedValues)this.serialization.restoreState("proposedValues");
 		} else {
 			this.maxNumberPrepared = new PrepareNumber((byte)0, 0);
-			this.proposedValues = new AcceptedValues();
+			this.learnedValues = new LearnedValues();
 		}
 	}
 
@@ -39,13 +39,21 @@ public class Acceptor {
 		PrepareRequest prepareRequest = acceptRequest.getPrepareRequest();
 		
 		if (prepareRequest.getNumber().getValue() >= this.maxNumberPrepared.getValue()) {
-			this.proposedValues.setAt(prepareRequest.getSlotNumber(), new AcceptedValue(prepareRequest.getSlotNumber(), acceptRequest.getValue(), prepareRequest.getNumber()));
+			this.learnedValues.setAt(prepareRequest.getSlotNumber(), new LearnedValue(prepareRequest.getSlotNumber(), acceptRequest.getValue(), prepareRequest.getNumber()));
 			
 			if (this.serialization != null) {
-				this.serialization.saveState("proposedValues", this.proposedValues);
+				this.serialization.saveState("proposedValues", this.learnedValues);
 			}
 		}
 		
 		return new AcceptResponse(prepareRequest, this.maxNumberPrepared.clone());
+	}
+	
+	public LearnRequest createLearnRequest(int slotNumber) {
+		LearnedValue learnedValue = this.learnedValues.getAt(slotNumber);
+		if (learnedValue == null) {
+			throw new PaxosException(PaxosException.VALUE_WAS_NOT_LEARNED);
+		}
+		return new LearnRequest(slotNumber, learnedValue);
 	}
 }

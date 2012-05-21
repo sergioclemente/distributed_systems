@@ -7,10 +7,12 @@ import paxos.*;
 public class TestDriver {
 	private Vector<Proposer> proposers;
 	private Vector<Acceptor> acceptors;
+	private Vector<Learner> learners;
 	
-	public TestDriver(int numberOfProposers, int numberOfAcceptors) {
+	public TestDriver(int numberOfProposers, int numberOfAcceptors, int numberOfLearners) {
 		this.proposers = new Vector<Proposer>();
 		this.acceptors = new Vector<Acceptor>();
+		this.learners = new Vector<Learner>();
 		
 		byte hostIdentifier = 0;		
 		
@@ -20,6 +22,10 @@ public class TestDriver {
 		
 		for (int i = 0; i< numberOfAcceptors; i++) {
 			this.acceptors.add(new Acceptor(hostIdentifier++, null));
+		}
+		
+		for (int i = 0; i< numberOfLearners; i++) {
+			this.learners.add(new Learner(hostIdentifier++));
 		}
 	}
 	
@@ -60,5 +66,20 @@ public class TestDriver {
 		}
 		
 		return accepted;
+	}
+	
+	public void learn(int acceptServer, int slotNumber) {
+		Acceptor acceptor = this.acceptors.get(acceptServer);
+		
+		LearnRequest request = acceptor.createLearnRequest(slotNumber);
+
+		
+		for (Learner learner : this.learners) {
+			learner.processAcceptResponse(request);
+		}
+	}
+	
+	public LearnedValue getLearnedValue(int learnServer, int slotNumber) {
+		return this.learners.get(learnServer).getLearnedValue(slotNumber);
 	}
 }
