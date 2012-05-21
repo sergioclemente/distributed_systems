@@ -77,7 +77,7 @@ public class Proposer {
 		PrepareState state = this.responses.get(prepareRequest.getSlotNumber());
 		 
 		int acceptCount = this.getAcceptCount(state);
-		int totalCount = this.getTotal(state);
+		int totalCount = state.getProposalResponses().size();
 		int remaining = this.numberOfAcceptors - totalCount;
 		
 		// Should we should the prepare when the number of acceptors + remaining
@@ -101,22 +101,7 @@ public class Proposer {
 		return acceptCount;
 	}
 	
-	// TODO: I don't like the name of this function, think in a better name
-	private int getTotal(PrepareState prepareState) {
-		int totalCount = 0;
-		PrepareNumber prepareNumber = prepareState.getPrepareRequest().getNumber();
-		
-		for (PrepareResponse prepareResponse : prepareState.getProposalResponses()) {
-			totalCount++;
-		}
-		
-		return totalCount;
-	}
-
-	
 	private Object getAnyAcceptedValue(PrepareState proposalState) {
-		PrepareNumber prepareNumber = proposalState.getPrepareRequest().getNumber();
-		
 		for (PrepareResponse prepareResponse : proposalState.getProposalResponses()) {
 			if (prepareResponse.getContent() != null) {
 				return prepareResponse.getContent();

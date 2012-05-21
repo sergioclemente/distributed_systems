@@ -29,29 +29,55 @@ public class TestDriver {
 		}
 	}
 	
+	private int[] generateArray(int size) {
+		int[] r = new int[size];
+		for(int i = 0; i < size; i++) {
+			r[i] = i;
+		}
+		
+		return r;
+	}
+	
 	public void prepare(int proposeServer, int slotNumber) {
+		prepare(proposeServer, slotNumber, generateArray(this.acceptors.size()));
+	}
+	
+	public void prepare(int proposeServer, int slotNumber, int[] acceptServers) {
 		Proposer proposer = this.proposers.get(proposeServer);
 		
 		PrepareRequest request = proposer.createPrepareRequest(slotNumber);
 		
-		for (Acceptor acceptor : this.acceptors) {
+		for (int idx : acceptServers) {
+			Acceptor acceptor = this.acceptors.get(idx);
+			
 			PrepareResponse response = acceptor.processPrepareRequest(request);
 			proposer.processPrepareResponse(response);
 		}
 	}
 	
 	public void rePrepare(int proposeServer, int slotNumber) {
+		rePrepare(proposeServer, slotNumber, generateArray(this.acceptors.size()));
+	}
+	
+	public void rePrepare(int proposeServer, int slotNumber, int[] acceptServers) {
 		Proposer proposer = this.proposers.get(proposeServer);
 		
 		PrepareRequest request = proposer.createRePrepareRequest(slotNumber);
 		
-		for (Acceptor acceptor : this.acceptors) {
+		for (int idx : acceptServers) {
+			Acceptor acceptor = this.acceptors.get(idx);
+			
 			PrepareResponse response = acceptor.processPrepareRequest(request);
 			proposer.processPrepareResponse(response);
 		}
 	}
 	
 	public boolean accept(int proposeServer, int slotNumber, Object value) {
+		return accept(proposeServer, slotNumber, value, generateArray(this.acceptors.size()));
+	}
+	
+	
+	public boolean accept(int proposeServer, int slotNumber, Object value, int[] acceptServers) {
 		Proposer proposer = this.proposers.get(proposeServer);
 		
 		AcceptRequest request = proposer.createAcceptRequest(slotNumber, value);
@@ -59,7 +85,8 @@ public class TestDriver {
 		long prepareNumberValue = request.getPrepareRequest().getNumber().getValue();
 		
 		boolean accepted = true;
-		for (Acceptor acceptor : this.acceptors) {
+		for (int idx : acceptServers) {
+			Acceptor acceptor = this.acceptors.get(idx);
 			AcceptResponse acceptResponse = acceptor.processAccept(request);
 			accepted = accepted && acceptResponse.getMaxNumberPreparedSoFar().getValue() == prepareNumberValue;
 			proposer.processAcceptResponse(acceptResponse);
@@ -69,12 +96,17 @@ public class TestDriver {
 	}
 	
 	public void learn(int acceptServer, int slotNumber) {
+		this.learn(acceptServer, slotNumber, generateArray(this.learners.size()));
+	}
+	
+	public void learn(int acceptServer, int slotNumber, int[] learnServers) {
 		Acceptor acceptor = this.acceptors.get(acceptServer);
 		
 		LearnRequest request = acceptor.createLearnRequest(slotNumber);
 
 		
-		for (Learner learner : this.learners) {
+		for (int idx : learnServers) {
+			Learner learner = this.learners.get(idx);
 			learner.processAcceptResponse(request);
 		}
 	}

@@ -15,6 +15,21 @@ public class MainTests {
 		processPrepareAcceptRePrepareTest();
 		processPrepareRePrepareMultiTest();
 		processLearnTest();
+		processConcurrentPrepareTest();
+	}
+	
+	private static void processConcurrentPrepareTest() {
+		TestDriver driver = new TestDriver(5,5,5);
+		driver.prepare(0, 0);
+		driver.accept(0, 0, "abc", new int[] {1,2}); // the first two will get the accept
+		driver.prepare(1, 0);
+		try {
+			driver.accept(1, 0, "cde");
+			Assert.isTrue(false);
+		}catch (PaxosException ex) {
+			Assert.equals(PaxosException.CANNOT_ACCEPT_WITH_DIFFERENT_VALUE, ex.getErrorCode());
+		}
+		print("processConcurrentPrepareTest Passed!");
 	}
 	
 	private static void processLearnTest() {
