@@ -29,6 +29,6 @@ public abstract class RPCSkeleton
 	
 	protected abstract String invokeInternal(String methodName, Vector<String> methodArgs) throws RPCException;
 	
-	protected abstract void BindMethods(RPCNode node);
+	protected abstract void bindMethods(RPCNode node);
 }
 
