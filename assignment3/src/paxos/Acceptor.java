@@ -41,15 +41,17 @@ public class Acceptor {
 	public AcceptResponse processAccept(AcceptRequest acceptRequest) {
 		PrepareRequest prepareRequest = acceptRequest.getPrepareRequest();
 		
+		boolean accepted = false;
 		if (prepareRequest.getNumber().getValue() >= this.maxNumberPrepared.getValue()) {
 			this.learnedValues.setAt(prepareRequest.getSlotNumber(), new LearnedValue(prepareRequest.getSlotNumber(), acceptRequest.getValue(), prepareRequest.getNumber()));
 			
 			if (this.serialization != null) {
 				this.serialization.saveState("proposedValues", this.learnedValues);
 			}
+			accepted = true;
 		}
 		
-		return new AcceptResponse(prepareRequest, this.maxNumberPrepared.clone());
+		return new AcceptResponse(prepareRequest, this.maxNumberPrepared.clone(), accepted);
 	}
 	
 	public LearnRequest createLearnRequest(int slotNumber) {
@@ -58,5 +60,9 @@ public class Acceptor {
 			throw new PaxosException(PaxosException.VALUE_WAS_NOT_LEARNED);
 		}
 		return new LearnRequest(slotNumber, learnedValue);
+	}
+	
+	public LearnedValue getLearnedValue(int slotNumber) {
+		return this.learnedValues.getAt(slotNumber);
 	}
 }

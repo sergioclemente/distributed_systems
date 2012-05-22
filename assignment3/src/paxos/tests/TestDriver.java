@@ -107,7 +107,7 @@ public class TestDriver {
 		
 		for (int idx : learnServers) {
 			Learner learner = this.learners.get(idx);
-			learner.processAcceptResponse(request);
+			learner.processLearnRequest(request);
 		}
 	}
 	

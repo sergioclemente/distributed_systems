@@ -6,35 +6,51 @@ import paxos.AcceptRequest;
 import paxos.AcceptResponse;
 import paxos.Acceptor;
 import paxos.Common;
+import paxos.LearnRequest;
+import paxos.Learner;
 import paxos.PrepareRequest;
 import paxos.PrepareResponse;
 import paxos.Proposer;
 import node.rpc.RPCNode;
 
 // This framework really sucks. we have to embedd logic from acceptor and proposer in a single node... /o\
-public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor {
+public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILearnerReply, ILearner {
 	private ProposerSystem proposerSystem;
 	private AcceptorSystem acceptorSystem;
+	private LearnerSystem learnerSystem;
 	
 	@Override
 	public void start() {
 		if (this.isAcceptor()) {
-			this.info("Starting acceptor node");
+			this.info("Starting acceptor node on address " + this.addr);
 			this.acceptorSystem = new AcceptorSystem((byte)this.addr, this);
+			
+			// Connect to the learners
+			for (int i = 10; i <= 14; i++) {
+				this.acceptorSystem.connectToLearner(i);
+			}
+			
+			Skel_AcceptorServer skel = new Skel_AcceptorServer(this);
+			skel.bindMethods(this);
 		}
 		
 		if (this.isProposer()) {
-			this.info("Starting proposer node");
+			this.info("Starting proposer node on address " + this.addr);
 			this.proposerSystem = new ProposerSystem((byte)this.addr, this);
 			
 			// Connect to the acceptors
 			for (int i = 5 ; i <= 9; i++) {
-				this.proposerSystem.connect(i);
+				this.proposerSystem.connectToAcceptor(i);
 			}
 		}
 		
-		Skel_AcceptorServer skel = new Skel_AcceptorServer(this);
-		skel.bindMethods(this);
+		if (this.isLearner()) {
+			this.info("Starting learner node on address " + this.addr);
+			this.learnerSystem = new LearnerSystem((byte)this.addr, this);
+			
+			Skel_LearnerServer skel = new Skel_LearnerServer(this);
+			skel.bindMethods(this);
+		}
 	}
 	
 	@Override
@@ -62,6 +78,16 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor {
 		this.info("Received accept() response from acceptor");
 		this.proposerSystem.getProposer().processAcceptResponse(response);
 	}
+
+	@Override
+	public void reply_learn(int replyId, int sender, int result) {
+		// Nothing to do...
+	}
+	
+	@Override
+	public void learn(LearnRequest request) {
+		this.learnerSystem.getLearner().processLearnRequest(request);
+	}
 	
 	@Override
 	public PrepareResponse prepare(PrepareRequest request) {
@@ -70,7 +96,14 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor {
 
 	@Override
 	public AcceptResponse accept(AcceptRequest request) {
-		return this.acceptorSystem.getAcceptor().processAccept(request);
+		AcceptResponse acceptResponse = this.acceptorSystem.getAcceptor().processAccept(request);
+		
+		if (acceptResponse.getAccepted()) {
+			// Notify the learners
+			this.acceptorSystem.learn(request.getPrepareRequest().getSlotNumber());
+		}
+		
+		return acceptResponse;
 	}
 	
 	private boolean isProposer() {
@@ -79,6 +112,10 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor {
 	
 	private boolean isAcceptor() {
 		return this.addr >= 5 && this.addr <= 9;
+	}
+	
+	private boolean isLearner() {
+		return this.addr >= 10 && this.addr <= 14;
 	}
 	
 	class ProposerSystem {
@@ -111,8 +148,8 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor {
 			}
 		}
 
-		public void connect(int addr) {
-			this.paxosNode.info("connecting to address " + addr);
+		public void connectToAcceptor(int addr) {
+			this.paxosNode.info("connecting to acceptor address " + addr);
 			Stub_AcceptorServer stub = new Stub_AcceptorServer(this.paxosNode, addr, this.paxosNode);
 			this.acceptors.put(addr, stub);
 		}
@@ -124,14 +161,46 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor {
 	class AcceptorSystem {
 		private Acceptor acceptor;
 		private PaxosNode paxosNode;
+		private Hashtable<Integer, ILearner> learners = new Hashtable<Integer, ILearner>();
 		
 		public AcceptorSystem(byte hostIdentifier, PaxosNode paxosNode) {
 			this.acceptor = new Acceptor(hostIdentifier, null); // TODO: missing serialization
 			this.paxosNode = paxosNode;
 		}
 		
+		public void learn(int slotNumber) {
+			this.paxosNode.info("learn() on slot " + slotNumber);
+			LearnRequest request = this.acceptor.createLearnRequest(slotNumber);
+			
+			for (ILearner learner: learners.values()) {
+				// accept return from the stub is null
+				learner.learn(request);
+			}
+			
+		}
+
+		public void connectToLearner(int addr) {
+			this.paxosNode.info("connecting to learner address " + addr);
+			Stub_LearnerServer stub = new Stub_LearnerServer(this.paxosNode, addr, this.paxosNode);
+			this.learners.put(addr, stub);
+		}
+
 		public Acceptor getAcceptor() {
 			return this.acceptor;
+		}
+	}
+	
+	class LearnerSystem {
+		private Learner learner;
+		private PaxosNode paxosNode;
+		
+		public LearnerSystem(byte hostIdentifier, PaxosNode paxosNode) {
+			this.learner = new Learner(hostIdentifier);
+			this.paxosNode = paxosNode;
+		}
+		
+		public Learner getLearner() {
+			return this.learner;
 		}
 	}
 }

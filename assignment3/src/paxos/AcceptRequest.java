@@ -1,5 +1,7 @@
 package paxos;
 
+import util.SerializationUtil;
+
 public class AcceptRequest {
 	private PrepareRequest prepareRequest;
 	private Object value;
@@ -15,5 +17,10 @@ public class AcceptRequest {
 
 	public Object getValue() {
 		return this.value;
+	}
+	
+	@Override
+	public String toString() {
+		return SerializationUtil.serialize(this);
 	}
 }

@@ -11,7 +11,6 @@ import paxos.*;
 import util.SerializationUtil;
 
 public class Skel_AcceptorServer extends RPCSkeleton {
-
 	private IAcceptor acceptor;
 	
 	public Skel_AcceptorServer(IAcceptor acceptor) {
@@ -46,5 +45,4 @@ public class Skel_AcceptorServer extends RPCSkeleton {
 		node.bindRpcMethod("prepare", this);
 		node.bindRpcMethod("accept", this);
 	}
-
 }
