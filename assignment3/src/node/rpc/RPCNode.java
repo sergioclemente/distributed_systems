@@ -198,42 +198,6 @@ public class RPCNode extends ReliableDeliveryNode
 	{
 	}
 	
-	/**
-	 * Called by 2pc to inform the node that it must abort the 
-	 * active transaction.
-	 */
-	public void abort(UUID transactionId)
-	{
-		
-	}
-	
-	/**
-	 * Called by 2pc to inform the node that it must commit the 
-	 * active transaction.
-	 */
-	public void commit(UUID transactionId)
-	{
-		
-	}
-	
-	/**
-	 * Called by 2pc to inform the node that it should prepare to commit
-	 * the active transaction (i.e. save state in durable storage).
-	 * Returns true if the state is properly saved, false otherwise.
-	 */
-	public boolean prepare(UUID transactionId)
-	{
-		return false;
-	}
-		
-	/**
-	 * onTwoPhaseCommitComplete() is called by the 2PC coordinator when
-	 * the transaction commits or aborts
-	 */
-	public void onTwoPhaseCommitComplete(UUID transactionId, boolean committed)
-	{
-		
-	}
 	
 	/**
 	 * bindRpcMethod()	
