@@ -1,5 +1,7 @@
 package node.rpc.paxos;
 
+import java.lang.reflect.Array;
+import java.util.Arrays;
 import java.util.Hashtable;
 
 import paxos.AcceptRequest;
@@ -18,6 +20,10 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 	private ProposerSystem proposerSystem;
 	private AcceptorSystem acceptorSystem;
 	private LearnerSystem learnerSystem;
+	
+	private final int[] ACCEPTOR_ADDRESSES = {5,6,7,8,9};
+	private final int[] PROPOSER_ADDRESSES = {0,1,2,3,4};
+	private final int[] LEARNER_ADDRESSES = {10,11,12,13,14};
 	
 	@Override
 	public void start() {
@@ -107,15 +113,15 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 	}
 	
 	private boolean isProposer() {
-		return this.addr >= 0 && this.addr <= 4;
+		return Arrays.binarySearch(PROPOSER_ADDRESSES, this.addr) >= 0;
 	}
 	
 	private boolean isAcceptor() {
-		return this.addr >= 5 && this.addr <= 9;
+		return Arrays.binarySearch(ACCEPTOR_ADDRESSES, this.addr) >= 0;
 	}
 	
 	private boolean isLearner() {
-		return this.addr >= 10 && this.addr <= 14;
+		return Arrays.binarySearch(LEARNER_ADDRESSES, this.addr) >= 0;
 	}
 	
 	class ProposerSystem {
