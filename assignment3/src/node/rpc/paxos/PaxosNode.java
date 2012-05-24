@@ -25,7 +25,11 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 	
 	private final int[] PROPOSER_ADDRESSES = {0,1,2}; //,3,4
 	private final int[] ACCEPTOR_ADDRESSES = {5,6,7}; //,8,9
-	private final int[] LEARNER_ADDRESSES = {10,11,12}; // ,13,14
+	private final int[] LEARNER_ADDRESSES = {10}; // ,11,12,13,14
+	
+	public PaxosNode() {
+		super(false); // do not use reliable transport
+	}
 	
 	@Override
 	public void start() {

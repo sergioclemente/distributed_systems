@@ -27,6 +27,7 @@ public class ReliableDeliveryNode extends Node {
 		public final static int ACK		= 2;
 		public final static int CONNECT	= 3;
 		public final static int RESET	= 4;
+		public final static int RAW 	= 5; 		// Skip the connection oriented protocol
 	}
 
 	
@@ -97,14 +98,15 @@ public class ReliableDeliveryNode extends Node {
 		{
 			onReceive_HandleReset(packet);
 		}
-		else
+		else if (packet.getType() == MESSAGE_TYPE.RAW)
 		{
+			onReceive_HandleRaw(packet);
+		} else {
 			// Unexpected message. Log and drop.
 			info("Unexpected message type: " + packet.getType());
 			assert false;
 		}
 	}
-
 
 	public void error(String msg) 
 	{
@@ -133,6 +135,19 @@ public class ReliableDeliveryNode extends Node {
 			// Put some markers in the beginning so we can easily distinguish between system messages
 			System.out.println(String.format("*** %d: INF: %s", this.addr, msg));
 		}
+	}
+	
+	/**
+	 * Methods that subclasses will call to unreliably send a message
+	 * @param targetNode
+	 * @param msgPayload
+	 */
+	protected void sendUnreliableMessage(int targetNode, byte[] msgPayload) {
+		Packet packet = Packet.create(this.addr, targetNode, MESSAGE_TYPE.RAW, -1, -1, msgPayload);
+		
+		// Send the packet
+		info("Sending unreliable packet: " + packet.stringize());
+		this.send(packet.getTo(), PROTOCOLS.SCOP, packet.toByteArray());
 	}
 
 	
@@ -550,6 +565,21 @@ public class ReliableDeliveryNode extends Node {
 			this.internalSendReset(packet.getFrom(), packet.getConnectionId(), packet.getSequence());
 		}
 	}
+	
+	private void onReceive_HandleRaw(Packet packet) {
+		info("Received new unreliable packet: " + packet.stringizeHeader());
+		this.onUnreliableMessageReceived(packet.getFrom(), packet.getPayload());
+	}
+	
+	/**
+	 * Method that subclasses will override to handle unreliably message received stuff
+	 * @param msgPayload
+	 */
+	protected void onUnreliableMessageReceived(int from, byte[] msgPayload) 
+	{
+		info("Received unreliable message from " + from + ": [" + Utility.byteArrayToString(msgPayload) + "]");
+	}
+
 	
 	/**
 	 * onReceive_HandleReset

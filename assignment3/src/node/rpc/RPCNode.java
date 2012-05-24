@@ -34,16 +34,18 @@ public class RPCNode extends ReliableDeliveryNode
 	private Hashtable<String, MethodInfo> m_methods;
 	private Hashtable<Integer, CallInfo> m_ongoingCalls;
 	protected Queue<String> _commandQueue;
+	private boolean useReliableTransport;
 	
 	
 	/**
 	 * RPCNode()
 	 */
-	public RPCNode()
+	public RPCNode(boolean useReliableTransport)
 	{
 		_commandQueue = new LinkedList<String>();
 		m_methods = new Hashtable<String, MethodInfo>();
 		m_ongoingCalls = new Hashtable<Integer, CallInfo>();
+		this.useReliableTransport = useReliableTransport;
 	}
 	
 
@@ -66,7 +68,12 @@ public class RPCNode extends ReliableDeliveryNode
 		
 		RPCMethodCall methodCall = new RPCMethodCall(methodName, params);
 		StringBuffer sb = methodCall.serialize();
-		super.sendReliableMessage(targetSender, Utility.stringToByteArray(sb.toString()));
+		
+		if (this.useReliableTransport) {
+			super.sendReliableMessage(targetSender, Utility.stringToByteArray(sb.toString()));
+		} else {
+			super.sendUnreliableMessage(targetSender, Utility.stringToByteArray(sb.toString()));
+		}
 	}
 	
 	/**
@@ -77,6 +84,16 @@ public class RPCNode extends ReliableDeliveryNode
 	@Override
 	protected void onReliableMessageReceived(int from, byte[] msg) 
 	{
+		this.onMessageReceived(from, msg);
+	}
+	
+	@Override
+	protected void onUnreliableMessageReceived(int from, byte[] msg) 
+	{
+		this.onMessageReceived(from, msg);
+	} 
+	
+	private void onMessageReceived(int from, byte[] msg) {
 		StringBuffer sb = new StringBuffer(Utility.byteArrayToString(msg));
 		RPCMethodCall methodCall = new RPCMethodCall(sb);
 		onMethodCalled(from, methodCall.getMethodName(), methodCall.getParams());
