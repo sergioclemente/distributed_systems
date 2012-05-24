@@ -56,9 +56,9 @@ public class Proposer {
 		return getAcceptCount(proposalState) >= majority;
 	}
 	
-	public boolean shouldResendPrepareRequest(PrepareRequest prepareRequest) {
+	public boolean shouldResendPrepareRequest(int slotNumber) {
 		int majority = this.numberOfAcceptors/2 + 1;
-		PrepareState state = this.responses.get(prepareRequest.getSlotNumber());
+		PrepareState state = this.responses.get(slotNumber);
 		 
 		int acceptCount = this.getAcceptCount(state);
 		int totalCount = state.getProposalResponses().size();
@@ -67,7 +67,26 @@ public class Proposer {
 		// Should we should the prepare when the number of acceptors + remaining
 		// can never be a majority
 		// TODO: it also have to consider timeouts
-		return acceptCount + remaining < majority;
+		return haveAnyNodeAccepted(state) || acceptCount + remaining < majority;
+	}
+
+	private boolean haveAnyNodeAccepted(PrepareState proposalState) {
+		return getFirstAcceptedValue(proposalState) != null;
+	}
+
+	public Object getFirstAcceptedValue(int slotNumber) {
+		PrepareState state = this.responses.get(slotNumber);
+		return getFirstAcceptedValue(state);
+	}
+	
+	private Object getFirstAcceptedValue(PrepareState proposalState) {
+		for (PrepareResponse prepareResponse : proposalState.getProposalResponses()) {
+			if (prepareResponse.getContent() != null) {
+				return prepareResponse.getContent();
+			}
+		}
+		
+		return null;
 	}
 
 	// TODO: I don't like the name of this function, think in a better name

@@ -162,7 +162,7 @@ public class MainTests {
 		Assert.isFalse(proposer.processPrepareResponse(response3));
 		Assert.isFalse(proposer.processPrepareResponse(response4));
 		
-		Assert.isTrue(proposer.shouldResendPrepareRequest(prepareRequest));
+		Assert.isTrue(proposer.shouldResendPrepareRequest(0));
 		PrepareRequest prepareRequestResend = proposer.createPrepareRequest(0);
 		PrepareResponse responseResend1 = new PrepareResponse((byte)1,prepareRequestResend,new PrepareNumber((byte)1,0), null);
 		PrepareResponse responseResend2 = new PrepareResponse((byte)2,prepareRequestResend,new PrepareNumber((byte)2,0), null);

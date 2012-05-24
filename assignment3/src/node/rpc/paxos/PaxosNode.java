@@ -1,14 +1,15 @@
 package node.rpc.paxos;
 
-import java.lang.reflect.Array;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Vector;
+
+import org.apache.commons.lang.math.RandomUtils;
 
 import paxos.AcceptRequest;
 import paxos.AcceptResponse;
 import paxos.Acceptor;
-import paxos.Common;
 import paxos.LearnRequest;
 import paxos.Learner;
 import paxos.PrepareRequest;
@@ -22,9 +23,9 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 	private AcceptorSystem acceptorSystem;
 	private LearnerSystem learnerSystem;
 	
-	private final int[] ACCEPTOR_ADDRESSES = {5,6,7,8,9};
-	private final int[] PROPOSER_ADDRESSES = {0,1,2,3,4};
-	private final int[] LEARNER_ADDRESSES = {10,11,12,13,14};
+	private final int[] PROPOSER_ADDRESSES = {0,1,2}; //,3,4
+	private final int[] ACCEPTOR_ADDRESSES = {5,6,7}; //,8,9
+	private final int[] LEARNER_ADDRESSES = {10,11,12}; // ,13,14
 	
 	@Override
 	public void start() {
@@ -33,8 +34,8 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 			this.acceptorSystem = new AcceptorSystem((byte)this.addr, this);
 			
 			// Connect to the learners
-			for (int i = 10; i <= 14; i++) {
-				this.acceptorSystem.connectToLearner(i);
+			for (int learnerAddr : LEARNER_ADDRESSES) {
+				this.acceptorSystem.connectToLearner(learnerAddr);
 			}
 			
 			Skel_AcceptorServer skel = new Skel_AcceptorServer(this);
@@ -46,8 +47,8 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 			this.proposerSystem = new ProposerSystem((byte)this.addr, this);
 			
 			// Connect to the acceptors
-			for (int i = 5 ; i <= 9; i++) {
-				this.proposerSystem.connectToAcceptor(i);
+			for (int acceptorAddr : ACCEPTOR_ADDRESSES) {
+				this.proposerSystem.connectToAcceptor(acceptorAddr);
 			}
 		}
 		
@@ -69,6 +70,8 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 			this.proposerSystem.prepare(Integer.parseInt(parts[1]));
 		} else if (methodName.equals("accept")) {
 			this.proposerSystem.accept(Integer.parseInt(parts[1]), parts[2]);
+		} else if (methodName.equals("execute_command")) {
+			this.proposerSystem.executeCommand(command.replaceFirst("execute_command ", ""));
 		}
 	}
 
@@ -76,14 +79,14 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 	public void reply_prepare(int replyId, int sender, int result,
 			PrepareResponse response) {
 		this.info("Received prepare() response from acceptor");
-		this.proposerSystem.getProposer().processPrepareResponse(response);
+		this.proposerSystem.processPrepareResponse(response);
 	}
 
 	@Override
 	public void reply_accept(int replyId, int sender, int result,
 			AcceptResponse response) {
 		this.info("Received accept() response from acceptor");
-		this.proposerSystem.getProposer().processAcceptResponse(response);
+		this.proposerSystem.processAcceptResponse(response);
 	}
 
 	@Override
@@ -128,13 +131,70 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 	class ProposerSystem {
 		private PaxosNode paxosNode;
 		private Proposer proposer;
+		private int currentSlot;
 		private Vector<IAcceptor> acceptors = new Vector<IAcceptor>();
+		private Hashtable<Integer, String> mapSlotToCommands = new Hashtable<Integer, String>();
+		
+		private HashSet<Integer> slotsAlreadyAccepted = new HashSet<Integer>();
+ 
 		
 		public ProposerSystem(byte hostIdentifier, PaxosNode paxosNode) {
-			this.proposer = new Proposer(hostIdentifier, Common.NUMBER_OF_ACCEPTORS);
+			this.proposer = new Proposer(hostIdentifier, ACCEPTOR_ADDRESSES.length);
 			this.paxosNode = paxosNode;
 		}
 		
+		public void processAcceptResponse(AcceptResponse response) {
+			this.proposer.processAcceptResponse(response);
+			
+			boolean accepted = response.getMaxNumberPreparedSoFar().getValue() 
+					== response.getPrepareRequest().getNumber().getValue();
+			
+			// TODO: handle timeouts
+			if (!accepted) {
+				reExecuteCommand(response.getPrepareRequest());
+			}
+		}
+
+		public void processPrepareResponse(PrepareResponse response) {
+			boolean canAccept = this.proposer.processPrepareResponse(response);
+			
+			int slotNumber = response.getPrepareRequest().getSlotNumber();
+			
+			// TODO: handle timeouts & drops
+			if (canAccept) {
+				if (this.mapSlotToCommands.containsKey(slotNumber) 
+						&& !this.slotsAlreadyAccepted.contains(slotNumber)) {
+					this.slotsAlreadyAccepted.add(slotNumber);
+					String command = this.mapSlotToCommands.get(slotNumber);
+					this.accept(slotNumber, command);
+				}
+			} else {
+				if (this.proposer.shouldResendPrepareRequest(slotNumber)) {
+					this.prepare(slotNumber);
+				} else {
+					if (this.proposer.getFirstAcceptedValue(slotNumber) != null) {
+						// try on next slot
+						this.reExecuteCommand(response.getPrepareRequest());
+					}
+				}
+			}
+		}
+
+		private void reExecuteCommand(PrepareRequest request) {
+			int slotNumber = request.getSlotNumber();
+			
+			if (this.mapSlotToCommands.containsKey(slotNumber)) {
+				String command = this.mapSlotToCommands.get(slotNumber);
+				this.mapSlotToCommands.remove(slotNumber);
+				this.executeCommand(command);				
+			}
+		}
+
+		public void executeCommand(String command) {
+			this.mapSlotToCommands.put(this.currentSlot, command);
+			this.prepare(currentSlot++);
+		}
+
 		public void prepare(int slotNumber) {
 			this.paxosNode.info("prepare() on slot " + slotNumber);
 			PrepareRequest request = this.proposer.createPrepareRequest(slotNumber);
