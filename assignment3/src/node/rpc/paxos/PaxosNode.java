@@ -3,6 +3,7 @@ package node.rpc.paxos;
 import java.lang.reflect.Array;
 import java.util.Arrays;
 import java.util.Hashtable;
+import java.util.Vector;
 
 import paxos.AcceptRequest;
 import paxos.AcceptResponse;
@@ -127,7 +128,7 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 	class ProposerSystem {
 		private PaxosNode paxosNode;
 		private Proposer proposer;
-		private Hashtable<Integer, IAcceptor> acceptors = new Hashtable<Integer, IAcceptor>();
+		private Vector<IAcceptor> acceptors = new Vector<IAcceptor>();
 		
 		public ProposerSystem(byte hostIdentifier, PaxosNode paxosNode) {
 			this.proposer = new Proposer(hostIdentifier, Common.NUMBER_OF_ACCEPTORS);
@@ -138,7 +139,7 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 			this.paxosNode.info("prepare() on slot " + slotNumber);
 			PrepareRequest request = this.proposer.createPrepareRequest(slotNumber);
 			
-			for (IAcceptor acceptor: acceptors.values()) {
+			for (IAcceptor acceptor: acceptors) {
 				// The prepare return from the stub is null
 				acceptor.prepare(request);
 			}
@@ -148,7 +149,7 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 			this.paxosNode.info("accept() on slot " + slotNumber);
 			AcceptRequest request = this.proposer.createAcceptRequest(slotNumber, value);
 			
-			for (IAcceptor acceptor: acceptors.values()) {
+			for (IAcceptor acceptor: acceptors) {
 				// accept return from the stub is null
 				acceptor.accept(request);
 			}
@@ -157,7 +158,7 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 		public void connectToAcceptor(int addr) {
 			this.paxosNode.info("connecting to acceptor address " + addr);
 			Stub_AcceptorServer stub = new Stub_AcceptorServer(this.paxosNode, addr, this.paxosNode);
-			this.acceptors.put(addr, stub);
+			this.acceptors.add(stub);
 		}
 
 		public Proposer getProposer() {
@@ -167,7 +168,7 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 	class AcceptorSystem {
 		private Acceptor acceptor;
 		private PaxosNode paxosNode;
-		private Hashtable<Integer, ILearner> learners = new Hashtable<Integer, ILearner>();
+		private Vector<ILearner> learners = new Vector<ILearner>();
 		
 		public AcceptorSystem(byte hostIdentifier, PaxosNode paxosNode) {
 			this.acceptor = new Acceptor(hostIdentifier, null); // TODO: missing serialization
@@ -178,7 +179,7 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 			this.paxosNode.info("learn() on slot " + slotNumber);
 			LearnRequest request = this.acceptor.createLearnRequest(slotNumber);
 			
-			for (ILearner learner: learners.values()) {
+			for (ILearner learner: learners) {
 				// accept return from the stub is null
 				learner.learn(request);
 			}
@@ -188,7 +189,7 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 		public void connectToLearner(int addr) {
 			this.paxosNode.info("connecting to learner address " + addr);
 			Stub_LearnerServer stub = new Stub_LearnerServer(this.paxosNode, addr, this.paxosNode);
-			this.learners.put(addr, stub);
+			this.learners.add(stub);
 		}
 
 		public Acceptor getAcceptor() {
