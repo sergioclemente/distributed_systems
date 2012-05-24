@@ -12,12 +12,10 @@ public class PaxosException extends RuntimeException {
 	public static final int CONTENT_IS_NULL = 2;
 	public static final int VALUE_IS_NULL = 3;
 	public static final int PREVIOUS_VALUE_DIFFERENT_THAN_CURRENT = 4;
-	public static final int CANNOT_CREATE_PREPARE_REQUEST_WITH_PENDING_RESPONSES = 5;
 	public static final int ALREADY_RECEIVED_RESPONSE_FROM_THIS_ACCEPTOR = 6;
 	public static final int INVALID_STATE_NOT_WAITING_FOR_REPARE_RESPONSE = 7;
 	public static final int REQUEST_NUMBER_DIDNT_MATCH = 8;
 	public static final int CANNOT_CREATE_PREPARE_REQUEST_WITHOUT_PENDING_RESPONSES = 9;
-	public static final int CANNOT_CREATE_PREPARE_RESEND_WITHOUT_PENDING_RESPONSES = 10;
 	public static final int CANNOT_CREATE_ACCEPT_REQUEST = 11;
 	public static final int VALUE_WAS_NOT_LEARNED = 12;
 	public static final int CANNOT_ACCEPT_WITH_DIFFERENT_VALUE = 13;
@@ -47,8 +45,6 @@ public class PaxosException extends RuntimeException {
 				return "Value is null";
 			case PREVIOUS_VALUE_DIFFERENT_THAN_CURRENT:
 				return "Previous value different than current";
-			case CANNOT_CREATE_PREPARE_REQUEST_WITH_PENDING_RESPONSES:
-				return "Cannot create prepare request with pending responses";
 			case ALREADY_RECEIVED_RESPONSE_FROM_THIS_ACCEPTOR:
 				return "Already received response from this acceptor";
 			case INVALID_STATE_NOT_WAITING_FOR_REPARE_RESPONSE:
@@ -57,8 +53,6 @@ public class PaxosException extends RuntimeException {
 				return "Request id didn't match";
 			case CANNOT_CREATE_PREPARE_REQUEST_WITHOUT_PENDING_RESPONSES:
 				return "Cannot create prepare request without pending responses";
-			case CANNOT_CREATE_PREPARE_RESEND_WITHOUT_PENDING_RESPONSES:
-				return "Cannot create resend without pending responses";
 			case CANNOT_CREATE_ACCEPT_REQUEST:
 				return "Cannot create accept request";
 			case VALUE_WAS_NOT_LEARNED:

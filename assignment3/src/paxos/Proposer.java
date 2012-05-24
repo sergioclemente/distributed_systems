@@ -20,22 +20,6 @@ public class Proposer {
 	
 	// Prepare
 	public PrepareRequest createPrepareRequest(int slotNumber) {
-		// Check first if we have an outstanding prepare request
-		if (this.responses.containsKey(slotNumber)) {
-			throw new PaxosException(PaxosException.CANNOT_CREATE_PREPARE_REQUEST_WITH_PENDING_RESPONSES);
-		}
-		return this.internalCreatePrepareRequest(slotNumber);
-	}
-	
-	public PrepareRequest createRePrepareRequest(int slotNumber) {
-		// Check first if we have an outstanding prepare request
-		if (!this.responses.containsKey(slotNumber)) {
-			throw new PaxosException(PaxosException.CANNOT_CREATE_PREPARE_RESEND_WITHOUT_PENDING_RESPONSES);
-		}
-		return this.internalCreatePrepareRequest(slotNumber);		
-	}
-	
-	public PrepareRequest internalCreatePrepareRequest(int slotNumber) {
 		// Increment current prepare number
 		this.currentPrepareNumber.setSequenceNumber(this.currentPrepareNumber.getSequenceNumber()+1);
 		

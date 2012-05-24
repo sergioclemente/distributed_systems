@@ -48,8 +48,8 @@ public class MainTests {
 		driver.prepare(0, 0);
 		driver.prepare(1, 0);
 		Assert.isFalse(driver.accept(0, 0, "foo"));
-		driver.rePrepare(0, 0);
-		driver.rePrepare(0, 0);
+		driver.prepare(0, 0);
+		driver.prepare(0, 0);
 		Assert.isTrue(driver.accept(0, 0, "foo"));
 		print("processPrepareRePrepareMultiTest Passed!");
 	}
@@ -59,7 +59,7 @@ public class MainTests {
 		driver.prepare(0, 0);
 		driver.prepare(1, 0);
 		Assert.isFalse(driver.accept(0, 0, "foo"));
-		driver.rePrepare(0, 0);
+		driver.prepare(0, 0);
 		Assert.isTrue(driver.accept(0, 0, "foo"));
 		print("processPrepareAcceptRePrepareTest Passed!");
 	}
@@ -91,9 +91,8 @@ public class MainTests {
 		
 		try {
 			proposer.createPrepareRequest(0);
-			Assert.isTrue(false);
 		} catch (PaxosException ex) {
-			
+			Assert.isTrue(false);
 		}
 		
 		PrepareRequest prepareRequestSlot1 = proposer.createPrepareRequest(1);
@@ -164,7 +163,7 @@ public class MainTests {
 		Assert.isFalse(proposer.processPrepareResponse(response4));
 		
 		Assert.isTrue(proposer.shouldResendPrepareRequest(prepareRequest));
-		PrepareRequest prepareRequestResend = proposer.createRePrepareRequest(0);
+		PrepareRequest prepareRequestResend = proposer.createPrepareRequest(0);
 		PrepareResponse responseResend1 = new PrepareResponse((byte)1,prepareRequestResend,new PrepareNumber((byte)1,0), null);
 		PrepareResponse responseResend2 = new PrepareResponse((byte)2,prepareRequestResend,new PrepareNumber((byte)2,0), null);
 		PrepareResponse responseResend3 = new PrepareResponse((byte)3,prepareRequestResend,new PrepareNumber((byte)3,2), null);

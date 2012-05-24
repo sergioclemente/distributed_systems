@@ -55,23 +55,6 @@ public class TestDriver {
 		}
 	}
 	
-	public void rePrepare(int proposeServer, int slotNumber) {
-		rePrepare(proposeServer, slotNumber, generateArray(this.acceptors.size()));
-	}
-	
-	public void rePrepare(int proposeServer, int slotNumber, int[] acceptServers) {
-		Proposer proposer = this.proposers.get(proposeServer);
-		
-		PrepareRequest request = proposer.createRePrepareRequest(slotNumber);
-		
-		for (int idx : acceptServers) {
-			Acceptor acceptor = this.acceptors.get(idx);
-			
-			PrepareResponse response = acceptor.processPrepareRequest(request);
-			proposer.processPrepareResponse(response);
-		}
-	}
-	
 	public boolean accept(int proposeServer, int slotNumber, Object value) {
 		return accept(proposeServer, slotNumber, value, generateArray(this.acceptors.size()));
 	}
