@@ -16,16 +16,18 @@ import paxos.PrepareRequest;
 import paxos.PrepareResponse;
 import paxos.Proposer;
 import node.rpc.RPCNode;
+import node.storage.StorageSystemServer;
+import node.rpc.Skel_StorageServer;
 
-// This framework really sucks. we have to embedd logic from acceptor and proposer in a single node... /o\
 public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILearnerReply, ILearner {
 	private ProposerSystem proposerSystem;
 	private AcceptorSystem acceptorSystem;
 	private LearnerSystem learnerSystem;
+	private StorageSystemServer storageSystem;
 	
 	private final int[] PROPOSER_ADDRESSES = {0,1,2}; //,3,4
-	private final int[] ACCEPTOR_ADDRESSES = {5,6,7}; //,8,9
-	private final int[] LEARNER_ADDRESSES = {10}; // ,11,12,13,14
+	private final int[] ACCEPTOR_ADDRESSES = {0,1,2}; //{5,6,7}; //,8,9
+	private final int[] LEARNER_ADDRESSES  = {0,1,2}; //{10}; // ,11,12,13,14
 	
 	public PaxosNode() {
 		super(false); // do not use reliable transport
@@ -33,6 +35,8 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 	
 	@Override
 	public void start() {
+		super.start();
+		
 		if (this.isAcceptor()) {
 			this.info("Starting acceptor node on address " + this.addr);
 			this.acceptorSystem = new AcceptorSystem((byte)this.addr, this);
@@ -63,6 +67,11 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 			Skel_LearnerServer skel = new Skel_LearnerServer(this);
 			skel.bindMethods(this);
 		}
+		
+		this.info("Starting storage system on address " + this.addr);
+		storageSystem = new StorageSystemServer(this);
+		Skel_StorageServer storageSkel = new Skel_StorageServer(storageSystem);
+		storageSkel.bindMethods(this);
 	}
 	
 	@Override
@@ -79,35 +88,51 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 		}
 	}
 
+	/**
+	 * IAcceptor_Reply.reply_prepare()
+	 */
 	@Override
-	public void reply_prepare(int replyId, int sender, int result,
-			PrepareResponse response) {
+	public void reply_prepare(int replyId, int sender, int result, PrepareResponse response) {
 		this.info("Received prepare() response from acceptor");
 		this.proposerSystem.processPrepareResponse(response);
 	}
 
+	/**
+	 * IAcceptor_Reply.reply_accept()
+	 */
 	@Override
-	public void reply_accept(int replyId, int sender, int result,
-			AcceptResponse response) {
+	public void reply_accept(int replyId, int sender, int result, AcceptResponse response) {
 		this.info("Received accept() response from acceptor");
 		this.proposerSystem.processAcceptResponse(response);
 	}
 
+	/**
+	 * ILearner_Reply.reply_learn()
+	 */
 	@Override
 	public void reply_learn(int replyId, int sender, int result) {
 		// Nothing to do...
 	}
 	
+	/**
+	 * ILearner.learn()
+	 */
 	@Override
 	public void learn(LearnRequest request) {
 		this.learnerSystem.getLearner().processLearnRequest(request);
 	}
 	
+	/**
+	 * IAcceptor.prepare()
+	 */
 	@Override
 	public PrepareResponse prepare(PrepareRequest request) {
 		return this.acceptorSystem.getAcceptor().processPrepareRequest(request);
 	}
 
+	/**
+	 * IAcceptor.accept()
+	 */
 	@Override
 	public AcceptResponse accept(AcceptRequest request) {
 		AcceptResponse acceptResponse = this.acceptorSystem.getAcceptor().processAccept(request);
@@ -160,14 +185,13 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 		}
 
 		public void processPrepareResponse(PrepareResponse response) {
-			boolean canAccept = this.proposer.processPrepareResponse(response);
-			
+			boolean hasPrepareQuorum = this.proposer.processPrepareResponse(response);
 			int slotNumber = response.getPrepareRequest().getSlotNumber();
 			
 			// TODO: handle timeouts & drops
-			if (canAccept) {
-				if (this.mapSlotToCommands.containsKey(slotNumber) 
-						&& !this.slotsAlreadyAccepted.contains(slotNumber)) {
+			if (hasPrepareQuorum) {
+				// Got quorum, now we can send accept requests 
+				if (this.mapSlotToCommands.containsKey(slotNumber) && !this.slotsAlreadyAccepted.contains(slotNumber)) {
 					this.slotsAlreadyAccepted.add(slotNumber);
 					String command = this.mapSlotToCommands.get(slotNumber);
 					this.accept(slotNumber, command);
@@ -229,6 +253,7 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 			return this.proposer;
 		}
 	}
+	
 	class AcceptorSystem {
 		private Acceptor acceptor;
 		private PaxosNode paxosNode;

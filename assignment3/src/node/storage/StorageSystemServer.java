@@ -29,10 +29,12 @@ public class StorageSystemServer implements IStorageServer
 	
 	private RPCNode m_node;
 	
+	
 	public StorageSystemServer(RPCNode node)
 	{
 		m_node = node;
 	}
+	
 	
 	/**
 	 * API: createFile()
@@ -56,6 +58,7 @@ public class StorageSystemServer implements IStorageServer
 		}
 	}
 	
+	
 	/**
 	 * API: getFile()
 	 * @param fileName
@@ -77,6 +80,7 @@ public class StorageSystemServer implements IStorageServer
 			throw new RPCException(IO_EXCEPTION, null);
 		}
 	}	
+	
 	
 	/**
 	 * putFile()
@@ -103,6 +107,7 @@ public class StorageSystemServer implements IStorageServer
 		}
 	}
 	
+	
 	/**
 	 * API: appendToFile()
 	 * @param fileName
@@ -128,6 +133,7 @@ public class StorageSystemServer implements IStorageServer
 		}
 	}
 
+	
 	/**
 	 * API: deleteFile()
 	 * @param fileName
@@ -148,157 +154,6 @@ public class StorageSystemServer implements IStorageServer
 		}
 	}
 	
-	/**
-	 * Parses the command received by onCommand and actually executes it.
-	 * 
-	 * @param command - the command to be executed.
-	 */
-	/*
-	@Override
-	protected String executeClientCommand(String command)
-	{
-		String[] parts = command.split("\\s+");
-		
-		// at least command target fileName
-		if (parts.length >= 3)
-		{
-			String commandName = parts[0];
-			int targetSender = Integer.parseInt(parts[1]);
-			String fileName = parts[2];
-			
-			if (commandName.equals("create"))
-			{
-				beginCreateFile(targetSender, fileName);
-			}
-			else if (commandName.equals("get"))
-			{
-				beginGetFile(targetSender, fileName);
-			}
-			else if (commandName.equals("put") || commandName.equals("append"))
-			{							
-				if (parts.length < 4)
-				{
-					warn(String.format("Invalid number of arguments for 'put' or 'append'. Expected at least 4. Found: %1", parts.length));
-					popCommandAndExecuteNext();
-				}
-				
-				StringBuilder contents = new StringBuilder();
-				
-				for (int i = 3; i < parts.length; i++) {
-					contents.append(parts[i]);
-					// BUG: append " "?
-				}
-				
-				int contentsSize = contents.toString().getBytes().length;
-				
-				if (contentsSize > MAX_MESSAGE_SIZE)
-				{
-					error(String.format("Trying to send information about the max message size. Max size: %d, Actual size: %d", 
-							MAX_MESSAGE_SIZE, contentsSize));
-				}
-				
-				if (commandName.equals("put"))
-				{
-					beginPutFile(targetSender, fileName, contents.toString());
-				}
-				else
-				{
-					beginAppendFile(targetSender, fileName, contents.toString());
-				}
-			}
-			else if (commandName.equals("delete"))
-			{
-				beginDeleteFile(targetSender, fileName);
-			}
-			else
-			{
-				warn(String.format("Unknown command: %1", commandName));
-			}
-		}
-		else
-		{
-			// Will remove this command from the queue and executes the next one, if any
-			popCommandAndExecuteNext();
-		}
-	}
-	*/
-	
-	/**
-	 * Executes commands directed to the server version of the Storage System.
-	 * 
-	 * @param from - who invoked the server.
-	 * @param methodName - the method being invoked.
-	 * @param params - any parameters to the method.
-	 */
-	/*
-	private void executeServerCommand(String methodName,
-			Vector<String> params) {
-		if (params.size() < 1)
-		{
-			error(String.format("Invalid number of arguments passed. Expected 1, found %d", params.size()));
-		}
-		
-		String fileName = params.get(0);
-		
-		if (methodName.equals("create"))
-		{			
-			createFile(from, fileName);
-		}
-		else if (methodName.equals("get"))
-		{			
-			getFile(from, fileName);
-		}
-		else if (methodName.equals("put") || methodName.equals("append"))
-		{
-			if (params.size() < 2)
-			{
-				error(String.format("Invalid number of arguments passed. Expected 2, found %d", params.size()));
-			}
-			
-			StringBuilder contents = new StringBuilder();
-			ListIterator<String> iterator = params.listIterator(1);
-			while (iterator.hasNext())
-			{
-				contents.append(iterator.next());
-			}
-			
-			if (methodName.equals("put"))
-			{
-				putFile(from, fileName, contents.toString());
-			}
-			else 
-			{
-				appendToFile(from, fileName, contents.toString());
-			}
-		}
-		else if (methodName.equals("delete"))
-		{
-			deleteFile(from, fileName);
-		}
-		else
-		{
-			error(String.format("Unknown command: %d", methodName));
-		}
-	}
-	
-	private void endClientCommand(String methodName, Vector<String> params)
-	{
-		if (params.size() == 2 && params.get(0).equals("error"))
-		{
-			error(String.format("NODE %d: %s", addr, params.get(1)));
-			info("Commands queued will be removed from list.");
-			m_node._commandQueue.clear();
-			return;
-		}		
-		else if (methodName.equals("endGetFile"))
-		{
-			info(params.get(0));
-		}
-		
-		// Will remove this command from the queue and executes the next one, if any
-		popCommandAndExecuteNext();
-	}
-	*/
 
 	// some helpers for transaction
 	private String readAllLines(String filename)  {
@@ -311,6 +166,7 @@ public class StorageSystemServer implements IStorageServer
 
 	}
 
+	
 	private String readAll(PersistentStorageReader psr) {
 		StringBuffer sb = new StringBuffer();
 
@@ -357,6 +213,7 @@ public class StorageSystemServer implements IStorageServer
 		}
 	}
 	
+
 	public void appendFileContents(String filename, String contents) throws IOException {
 		try {
 			// update new
@@ -367,8 +224,8 @@ public class StorageSystemServer implements IStorageServer
 			throw e;
 		}
 	}
-	
 
+	
 	private String readFileContents(String fileName)
 			throws FileNotFoundException, IOException {
 		BufferedReader bufferedReader = m_node.getReader(fileName);
@@ -387,8 +244,6 @@ public class StorageSystemServer implements IStorageServer
 		return contents.toString();
 	}
 	
-
-
 	
 	private void recoverTempFileFromCrash() {
 		try {
