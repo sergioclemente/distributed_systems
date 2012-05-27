@@ -45,7 +45,10 @@ public class RPCNode extends ReliableDeliveryNode
 		_commandQueue = new LinkedList<String>();
 		m_methods = new Hashtable<String, MethodInfo>();
 		m_ongoingCalls = new Hashtable<Integer, CallInfo>();
-		this.useReliableTransport = useReliableTransport;
+		
+		// Using unreliable transport WILL screw up internal RPC state tracking.
+		//this.useReliableTransport = useReliableTransport;
+		this.useReliableTransport = true;
 	}
 	
 

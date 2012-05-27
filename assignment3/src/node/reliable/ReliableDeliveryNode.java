@@ -18,6 +18,7 @@ public class ReliableDeliveryNode extends Node {
 	public class PROTOCOLS {
 		public final static int UNKNOWN = 0;
 		public final static int SCOP 	= 1;		// Simple connection oriented protocol
+		public final static int RAW	    = 2;        // Unreliable delivery
 	}
 
 	
@@ -27,7 +28,6 @@ public class ReliableDeliveryNode extends Node {
 		public final static int ACK		= 2;
 		public final static int CONNECT	= 3;
 		public final static int RESET	= 4;
-		public final static int RAW 	= 5; 		// Skip the connection oriented protocol
 	}
 
 	
@@ -74,37 +74,41 @@ public class ReliableDeliveryNode extends Node {
 	@Override
 	public void onReceive(Integer from, int protocol, byte[] buffer) 
 	{
-		assert protocol == PROTOCOLS.SCOP;
-		
 		Packet packet = Packet.createFromBuffer(buffer);
 		assert packet.getFrom() == from;
 		assert packet.getTo() == this.addr;
-		
-		info(String.format("Received packet: %s", packet.stringize()));
 
-		if (packet.getType() == MESSAGE_TYPE.CONNECT)
+		if (protocol == PROTOCOLS.SCOP) 
 		{
-			onReceive_HandleConnect(packet);
+			info(String.format("Received SCOP packet: %s", packet.stringize()));
+
+			if (packet.getType() == MESSAGE_TYPE.CONNECT)
+			{
+				onReceive_HandleConnect(packet);
+			}
+			else if (packet.getType() == MESSAGE_TYPE.ACK)
+			{
+				onReceive_HandleAck(packet);
+			}
+			else if (packet.getType() == MESSAGE_TYPE.DATA)
+			{
+				onReceive_HandleData(packet);
+			}
+			else if (packet.getType() == MESSAGE_TYPE.RESET)
+			{
+				onReceive_HandleReset(packet);
+			} 
+			else 
+			{
+				// Unexpected message. Log and drop.
+				info("Unexpected message type: " + packet.getType());
+				assert false;
+			}
 		}
-		else if (packet.getType() == MESSAGE_TYPE.ACK)
+		else if (protocol == PROTOCOLS.RAW)
 		{
-			onReceive_HandleAck(packet);
-		}
-		else if (packet.getType() == MESSAGE_TYPE.DATA)
-		{
-			onReceive_HandleData(packet);
-		}
-		else if (packet.getType() == MESSAGE_TYPE.RESET)
-		{
-			onReceive_HandleReset(packet);
-		}
-		else if (packet.getType() == MESSAGE_TYPE.RAW)
-		{
-			onReceive_HandleRaw(packet);
-		} else {
-			// Unexpected message. Log and drop.
-			info("Unexpected message type: " + packet.getType());
-			assert false;
+			info("Received RAW packet: " + packet.stringizeHeader());
+			this.onUnreliableMessageReceived(packet.getFrom(), packet.getPayload());
 		}
 	}
 
@@ -142,12 +146,13 @@ public class ReliableDeliveryNode extends Node {
 	 * @param targetNode
 	 * @param msgPayload
 	 */
-	protected void sendUnreliableMessage(int targetNode, byte[] msgPayload) {
-		Packet packet = Packet.create(this.addr, targetNode, MESSAGE_TYPE.RAW, -1, -1, msgPayload);
+	protected void sendUnreliableMessage(int targetNode, byte[] msgPayload) 
+	{
+		Packet packet = Packet.create(this.addr, targetNode, MESSAGE_TYPE.UNKNOWN, -1, -1, msgPayload);
 		
 		// Send the packet
 		info("Sending unreliable packet: " + packet.stringize());
-		this.send(packet.getTo(), PROTOCOLS.SCOP, packet.toByteArray());
+		this.send(packet.getTo(), PROTOCOLS.RAW, packet.toByteArray());
 	}
 
 	
@@ -564,11 +569,6 @@ public class ReliableDeliveryNode extends Node {
 			info("Received stale DATA packet: " + packet.stringizeHeader());
 			this.internalSendReset(packet.getFrom(), packet.getConnectionId(), packet.getSequence());
 		}
-	}
-	
-	private void onReceive_HandleRaw(Packet packet) {
-		info("Received new unreliable packet: " + packet.stringizeHeader());
-		this.onUnreliableMessageReceived(packet.getFrom(), packet.getPayload());
 	}
 	
 	/**

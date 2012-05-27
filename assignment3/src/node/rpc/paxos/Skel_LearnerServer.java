@@ -34,7 +34,7 @@ public class Skel_LearnerServer extends RPCSkeleton {
 	}
 
 	@Override
-	protected void bindMethods(RPCNode node) {
+	public void bindMethods(RPCNode node) {
 		node.bindRpcMethod("learn", this);
 	}
 }
