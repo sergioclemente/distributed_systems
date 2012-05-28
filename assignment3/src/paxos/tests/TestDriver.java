@@ -25,7 +25,7 @@ public class TestDriver {
 		}
 		
 		for (int i = 0; i< numberOfLearners; i++) {
-			this.learners.add(new Learner(hostIdentifier++));
+			this.learners.add(new Learner(hostIdentifier++, this.acceptors.size()));
 		}
 	}
 	

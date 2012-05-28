@@ -15,6 +15,7 @@ public class MainTests {
 		processPrepareAcceptRePrepareTest();
 		processPrepareRePrepareMultiTest();
 		processLearnTest();
+		processLearnFromMinorityTest();
 		processConcurrentPrepareTest();
 	}
 	
@@ -38,9 +39,24 @@ public class MainTests {
 		Assert.isTrue(driver.accept(0, 0, "abc"));
 		Assert.isNull(driver.getLearnedValue(0, 0)); // Didn't learn yet
 		driver.learn(0, 0);
+		driver.learn(1, 0);
+		driver.learn(2, 0);
 		LearnedValue learnedValue = driver.getLearnedValue(0, 0);
 		Assert.isNotNull(learnedValue);
 		Assert.equals("abc", learnedValue.getContent());
+		print("processLearnTest Passed!");
+	}
+	
+	private static void processLearnFromMinorityTest() {
+		TestDriver driver = new TestDriver(5,5,5);
+		driver.prepare(0, 0);
+		Assert.isTrue(driver.accept(0, 0, "abc"));
+		Assert.isNull(driver.getLearnedValue(0, 0)); // Didn't learn yet
+		driver.learn(0, 0);
+		driver.learn(1, 0);
+		LearnedValue learnedValue = driver.getLearnedValue(0, 0);
+		Assert.isNull(learnedValue);
+		print("processLearnFromMinorityTest Passed!");
 	}
 
 	private static void processPrepareRePrepareMultiTest() {

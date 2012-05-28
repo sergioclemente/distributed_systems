@@ -266,7 +266,7 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 		private PaxosNode paxosNode;
 		
 		public LearnerSystem(byte hostIdentifier, PaxosNode paxosNode) {
-			this.learner = new Learner(hostIdentifier);
+			this.learner = new Learner(hostIdentifier, paxosNode.proposerSystem.getProposer().getNumberOfAcceptors());
 			this.paxosNode = paxosNode;
 		}
 		
