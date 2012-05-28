@@ -51,7 +51,7 @@ public class Skel_StorageServer extends RPCSkeleton
 	}
 	
 	@Override
-	protected void bindMethods(RPCNode node)
+	public void bindMethods(RPCNode node)
 	{
 		node.bindRpcMethod("createFile", this);
 		node.bindRpcMethod("getFile", this);
