@@ -230,75 +230,51 @@ public class StorageSystemServer implements IStorageServer
 	 * @param methodName - the method being invoked.
 	 * @param params - any parameters to the method.
 	 */
-	/*
-	private void executeServerCommand(String methodName,
-			Vector<String> params) {
-		if (params.size() < 1)
+	public void executeCommand(String command) throws RPCException {
+		String[] parts = command.split(" ");
+		String methodName = parts[0];
+		
+		String[] params = new String[parts.length-1];
+		System.arraycopy(parts, 1, params, 0, params.length);
+		
+		if (params.length < 1)
 		{
-			error(String.format("Invalid number of arguments passed. Expected 1, found %d", params.size()));
+			return;
 		}
 		
-		String fileName = params.get(0);
+		String fileName = params[0];
 		
 		if (methodName.equals("create"))
 		{			
-			createFile(from, fileName);
+			createFile(fileName);
 		}
 		else if (methodName.equals("get"))
 		{			
-			getFile(from, fileName);
+			getFile(fileName);
 		}
 		else if (methodName.equals("put") || methodName.equals("append"))
 		{
-			if (params.size() < 2)
+			if (params.length < 2)
 			{
-				error(String.format("Invalid number of arguments passed. Expected 2, found %d", params.size()));
+				return;
 			}
 			
-			StringBuilder contents = new StringBuilder();
-			ListIterator<String> iterator = params.listIterator(1);
-			while (iterator.hasNext())
-			{
-				contents.append(iterator.next());
-			}
-			
+			String contents = command.substring(methodName.length()+1);
+						
 			if (methodName.equals("put"))
 			{
-				putFile(from, fileName, contents.toString());
+				putFile(fileName, contents);
 			}
 			else 
 			{
-				appendToFile(from, fileName, contents.toString());
+				appendToFile(fileName, contents);
 			}
 		}
 		else if (methodName.equals("delete"))
 		{
-			deleteFile(from, fileName);
-		}
-		else
-		{
-			error(String.format("Unknown command: %d", methodName));
+			deleteFile(fileName);
 		}
 	}
-	
-	private void endClientCommand(String methodName, Vector<String> params)
-	{
-		if (params.size() == 2 && params.get(0).equals("error"))
-		{
-			error(String.format("NODE %d: %s", addr, params.get(1)));
-			info("Commands queued will be removed from list.");
-			m_node._commandQueue.clear();
-			return;
-		}		
-		else if (methodName.equals("endGetFile"))
-		{
-			info(params.get(0));
-		}
-		
-		// Will remove this command from the queue and executes the next one, if any
-		popCommandAndExecuteNext();
-	}
-	*/
 
 	// some helpers for transaction
 	private String readAllLines(String filename)  {
@@ -411,5 +387,4 @@ public class StorageSystemServer implements IStorageServer
 			e.printStackTrace();
 		}
 	}
-
 }

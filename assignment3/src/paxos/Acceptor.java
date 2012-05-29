@@ -13,10 +13,14 @@ public class Acceptor {
 		this.serialization = serialization;
 		
 		if (this.serialization != null) {
-			this.maxNumberPrepared = (PrepareNumber)this.serialization.restoreState("maxNumberPrepared");
+			this.maxNumberPrepared = (PrepareNumber)this.serialization.restoreState("maxNumberPrepared");			
 			this.learnedValues = (LearnedValues)this.serialization.restoreState("proposedValues");
-		} else {
+		}
+		
+		if (this.maxNumberPrepared == null) {
 			this.maxNumberPrepared = new PrepareNumber((byte)0, 0);
+		}
+		if (this.learnedValues == null) {
 			this.learnedValues = new LearnedValues();
 		}
 	}

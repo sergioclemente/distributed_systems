@@ -87,7 +87,6 @@ public class TestDriver {
 		
 		LearnRequest request = acceptor.createLearnRequest(slotNumber);
 
-		
 		for (int idx : learnServers) {
 			Learner learner = this.learners.get(idx);
 			learner.processLearnRequest(request);

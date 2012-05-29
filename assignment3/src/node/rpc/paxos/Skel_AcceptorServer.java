@@ -47,7 +47,7 @@ public class Skel_AcceptorServer extends RPCSkeleton {
 	}
 
 	@Override
-	protected void bindMethods(RPCNode node) {
+	public void bindMethods(RPCNode node) {
 		node.bindRpcMethod("prepare", this);
 		node.bindRpcMethod("accept", this);
 		node.bindRpcMethod("getAcceptedValue", this);

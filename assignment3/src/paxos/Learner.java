@@ -27,11 +27,13 @@ public class Learner {
 		this.numberOfAcceptors = numberOfAcceptors;
 	}
 	
-	public void processLearnRequest(LearnRequest learnRequest) {
+	public boolean processLearnRequest(LearnRequest learnRequest) {
 		int slotNumber = learnRequest.getSlotNumber();
 		
 		// We have already learned the value for this proposal number		
-		if (learnedValues.getAt(slotNumber) != null) return;
+		if (learnedValues.getAt(slotNumber) != null) {
+			return false;
+		}
 		
 		if (!numAcceptNotifications.containsKey(slotNumber))
 		{
@@ -46,11 +48,13 @@ public class Learner {
 			numAcceptNotifications.remove(slotNumber);
 			learnedValues.setAt(slotNumber, learnRequest.getLearnedValue());
 			
-			//TODO-licavalc: maybe we should save to stable storage here.			
+			//TODO-licavalc: maybe we should save to stable storage here.		
+			return true;
 		}
 		else
 		{
 			numAcceptNotifications.put(slotNumber, countAcceptedNotifications);
+			return false;
 		}
 	}
 

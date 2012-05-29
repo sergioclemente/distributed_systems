@@ -18,17 +18,23 @@ import paxos.Learner;
 import paxos.PrepareRequest;
 import paxos.PrepareResponse;
 import paxos.Proposer;
+import util.NodeSerialization;
+import node.rpc.RPCException;
 import node.rpc.RPCNode;
+import node.rpc.Skel_StorageServer;
+import node.storage.StorageSystemServer;
 
 // This framework really sucks. we have to embedd logic from acceptor and proposer in a single node... /o\
 public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILearnerReply, ILearner {
 	private ProposerSystem proposerSystem;
 	private AcceptorSystem acceptorSystem;
 	private LearnerSystem learnerSystem;
+	private StorageSystemServer storageSystem;
 	
 	private final int[] PROPOSER_ADDRESSES = {0,1,2}; //,3,4
 	private final int[] ACCEPTOR_ADDRESSES = {5,6,7}; //,8,9
 	private final int[] LEARNER_ADDRESSES = {10}; // ,11,12,13,14
+
 	
 	public PaxosNode() {
 		super(false); // do not use reliable transport
@@ -36,6 +42,8 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 	
 	@Override
 	public void start() {
+		super.start();
+		
 		if (this.isAcceptor()) {
 			this.info("Starting acceptor node on address " + this.addr);
 			this.acceptorSystem = new AcceptorSystem((byte)this.addr, this);
@@ -45,8 +53,8 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 				this.acceptorSystem.connectToLearner(learnerAddr);
 			}
 			
-			Skel_AcceptorServer skel = new Skel_AcceptorServer(this);
-			skel.bindMethods(this);
+			Skel_AcceptorServer skel_Acceptor = new Skel_AcceptorServer(this);
+			skel_Acceptor.bindMethods(this);
 		}
 		
 		if (this.isProposer()) {
@@ -61,7 +69,10 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 		
 		if (this.isLearner()) {
 			this.info("Starting learner node on address " + this.addr);
-			this.learnerSystem = new LearnerSystem((byte)this.addr, this);
+			this.learnerSystem = new LearnerSystem((byte)this.addr, this, ACCEPTOR_ADDRESSES.length);
+			
+			Skel_LearnerServer skel_Learner = new Skel_LearnerServer(this);
+			skel_Learner.bindMethods(this);
 			
 			// Connect to the acceptors
 			for (int acceptorAddr : ACCEPTOR_ADDRESSES) {
@@ -70,6 +81,11 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 			
 			Skel_LearnerServer skel = new Skel_LearnerServer(this);
 			skel.bindMethods(this);
+			
+			// Storage system is co-located with the learner
+			this.storageSystem = new StorageSystemServer(this);
+			Skel_StorageServer skel_Storage = new Skel_StorageServer(this.storageSystem);
+			skel_Storage.bindMethods(this);
 		}
 	}
 	
@@ -107,8 +123,15 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 	}
 	
 	@Override
-	public void learn(LearnRequest request) {
-		this.learnerSystem.processLearnRequest(request);
+	public void learn(LearnRequest request) {		
+		boolean learned = this.learnerSystem.processLearnRequest(request);
+		if (learned) {
+			try	{
+				this.storageSystem.executeCommand((String)request.getLearnedValue().getContent());	
+			} catch (RPCException ex) {
+				ex.printStackTrace();
+			}
+		}
 	}
 	
 	@Override
@@ -248,7 +271,7 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 		private Map<Integer, ILearner> learners = new HashMap<Integer, ILearner>();
 		
 		public AcceptorSystem(byte hostIdentifier, PaxosNode paxosNode) {
-			this.acceptor = new Acceptor(hostIdentifier, null); // TODO: missing serialization
+			this.acceptor = new Acceptor(hostIdentifier, new NodeSerialization(paxosNode, "serialization.txt"));
 			this.paxosNode = paxosNode;
 		}
 		
@@ -288,15 +311,13 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 		private PaxosNode paxosNode;
 		private Vector<IAcceptor> acceptors = new Vector<IAcceptor>();
 		
-		public LearnerSystem(byte hostIdentifier, PaxosNode paxosNode) {
-			this.learner = new Learner(hostIdentifier, paxosNode.proposerSystem.getProposer().getNumberOfAcceptors());
+		public LearnerSystem(byte hostIdentifier, PaxosNode paxosNode, int numberOfAcceptors) {
+			this.learner = new Learner(hostIdentifier, numberOfAcceptors);
 			this.paxosNode = paxosNode;
 		}
 
-		public void processLearnRequest(LearnRequest request) {
-			int currentSlotNumber = request.getSlotNumber();
-			
-			this.learner.processLearnRequest(request);
+		public boolean processLearnRequest(LearnRequest request) {
+			int currentSlotNumber = request.getSlotNumber();					
 			
 			for (int i = currentSlotNumber - 1; i >= 0; i--) {
 				if (this.learner.shouldStartLearningProcess(i))
@@ -304,6 +325,8 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 					startLearningProcess(i);
 				}
 			}
+			
+			return this.learner.processLearnRequest(request);
 		}
 		
 		public void connectToAcceptor(int addr) {
