@@ -153,137 +153,60 @@ public class StorageSystemServer implements IStorageServer
 			throw new RPCException(IO_EXCEPTION, null);
 		}
 	}
-	
-<<<<<<< HEAD
-=======
-	/**
-	 * Parses the command received by onCommand and actually executes it.
-	 * 
-	 * @param command - the command to be executed.
-	 */
-	/*
-	@Override
-	protected String executeClientCommand(String command)
-	{
-		String[] parts = command.split("\\s+");
-		
-		// at least command target fileName
-		if (parts.length >= 3)
-		{
-			String commandName = parts[0];
-			int targetSender = Integer.parseInt(parts[1]);
-			String fileName = parts[2];
-			
-			if (commandName.equals("create"))
-			{
-				beginCreateFile(targetSender, fileName);
-			}
-			else if (commandName.equals("get"))
-			{
-				beginGetFile(targetSender, fileName);
-			}
-			else if (commandName.equals("put") || commandName.equals("append"))
-			{							
-				if (parts.length < 4)
-				{
-					warn(String.format("Invalid number of arguments for 'put' or 'append'. Expected at least 4. Found: %1", parts.length));
-					popCommandAndExecuteNext();
-				}
-				
-				StringBuilder contents = new StringBuilder();
-				
-				for (int i = 3; i < parts.length; i++) {
-					contents.append(parts[i]);
-					// BUG: append " "?
-				}
-				
-				int contentsSize = contents.toString().getBytes().length;
-				
-				if (contentsSize > MAX_MESSAGE_SIZE)
-				{
-					error(String.format("Trying to send information about the max message size. Max size: %d, Actual size: %d", 
-							MAX_MESSAGE_SIZE, contentsSize));
-				}
-				
-				if (commandName.equals("put"))
-				{
-					beginPutFile(targetSender, fileName, contents.toString());
-				}
-				else
-				{
-					beginAppendFile(targetSender, fileName, contents.toString());
-				}
-			}
-			else if (commandName.equals("delete"))
-			{
-				beginDeleteFile(targetSender, fileName);
-			}
-			else
-			{
-				warn(String.format("Unknown command: %1", commandName));
-			}
-		}
-		else
-		{
-			// Will remove this command from the queue and executes the next one, if any
-			popCommandAndExecuteNext();
-		}
-	}
-	*/
-	
-	/**
-	 * Executes commands directed to the server version of the Storage System.
-	 * 
-	 * @param from - who invoked the server.
-	 * @param methodName - the method being invoked.
-	 * @param params - any parameters to the method.
-	 */
-	public void executeCommand(String command) throws RPCException {
-		String[] parts = command.split(" ");
-		String methodName = parts[0];
-		
-		String[] params = new String[parts.length-1];
-		System.arraycopy(parts, 1, params, 0, params.length);
-		
-		if (params.length < 1)
-		{
-			return;
-		}
-		
-		String fileName = params[0];
-		
-		if (methodName.equals("create"))
-		{			
-			createFile(fileName);
-		}
-		else if (methodName.equals("get"))
-		{			
-			getFile(fileName);
-		}
-		else if (methodName.equals("put") || methodName.equals("append"))
-		{
-			if (params.length < 2)
-			{
-				return;
-			}
-			
-			String contents = command.substring(methodName.length()+1);
-						
-			if (methodName.equals("put"))
-			{
-				putFile(fileName, contents);
-			}
-			else 
-			{
-				appendToFile(fileName, contents);
-			}
-		}
-		else if (methodName.equals("delete"))
-		{
-			deleteFile(fileName);
-		}
-	}
->>>>>>> 19f9b27856bd1ee8ce548e496d700e9274f8991d
+
+
+    /**
+     * Executes commands directed to the server version of the Storage System.
+     *
+     * @param from - who invoked the server.
+     * @param methodName - the method being invoked.
+     * @param params - any parameters to the method.
+     */
+    public void executeCommand(String command) throws RPCException {
+    	String[] parts = command.split(" ");
+    	String methodName = parts[0];
+
+    	String[] params = new String[parts.length-1];
+    	System.arraycopy(parts, 1, params, 0, params.length);
+
+    	if (params.length < 1)
+    	{
+    		return;
+    	}
+
+    	String fileName = params[0];
+
+    	if (methodName.equals("create"))
+        {
+    		createFile(fileName);
+        }
+    	else if (methodName.equals("get"))
+    	{
+    		getFile(fileName);
+    	}
+    	else if (methodName.equals("put") || methodName.equals("append"))
+    	{
+    		if (params.length < 2)
+    		{
+    			return;
+    		}
+
+    		String contents = command.substring(methodName.length()+1);
+
+    		if (methodName.equals("put"))
+    		{
+    			putFile(fileName, contents);
+    		}
+    		else
+    		{
+    			appendToFile(fileName, contents);
+    		}
+    	}
+    	else if (methodName.equals("delete"))
+    	{
+    		deleteFile(fileName);
+    	}
+    }	
 
 	// some helpers for transaction
 	private String readAllLines(String filename)  {

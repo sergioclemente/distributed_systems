@@ -45,6 +45,19 @@ public class PrepareState {
 		return this.responses.values();
 	}
 	
+	public int getHighestSequenceNumber() {
+		int sn = 0;
+		
+		for (PrepareResponse response : responses.values()) {
+			if (response.getHighestAcceptedProposalSoFar() != null && 
+					response.getHighestAcceptedProposalSoFar().getSequenceNumber() > sn) {
+				sn = response.getHighestAcceptedProposalSoFar().getSequenceNumber();
+			}
+		}
+		
+		return sn;
+	}
+	
 	@Override
 	public String toString() {
 		return SerializationUtil.serialize(this);

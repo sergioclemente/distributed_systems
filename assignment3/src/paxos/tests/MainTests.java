@@ -128,10 +128,10 @@ public class MainTests {
 		PrepareRequest prepareRequest = proposer.createPrepareRequest(0);
 		
 		// Simulate the responses
-		PrepareResponse response1 = new PrepareResponse((byte)1,prepareRequest,new PrepareNumber((byte)1,0), null);
-		PrepareResponse response2 = new PrepareResponse((byte)2,prepareRequest,new PrepareNumber((byte)2,0), null);
-		PrepareResponse response3 = new PrepareResponse((byte)3,prepareRequest,new PrepareNumber((byte)3,0), null);
-		PrepareResponse response4 = new PrepareResponse((byte)4,prepareRequest,new PrepareNumber((byte)4,0), null);
+		PrepareResponse response1 = new PrepareResponse((byte)1,prepareRequest,true,new PrepareNumber((byte)1,0), null);
+		PrepareResponse response2 = new PrepareResponse((byte)2,prepareRequest,true,new PrepareNumber((byte)2,0), null);
+		PrepareResponse response3 = new PrepareResponse((byte)3,prepareRequest,true,new PrepareNumber((byte)3,0), null);
+		PrepareResponse response4 = new PrepareResponse((byte)4,prepareRequest,true,new PrepareNumber((byte)4,0), null);
 		
 		Assert.isFalse(proposer.processPrepareResponse(response1));
 		Assert.isFalse(proposer.processPrepareResponse(response2));
@@ -148,10 +148,10 @@ public class MainTests {
 		PrepareRequest prepareRequest = proposer.createPrepareRequest(0);
 		
 		// Simulate the responses
-		PrepareResponse response1 = new PrepareResponse((byte)1,prepareRequest,new PrepareNumber((byte)2,2), null);
-		PrepareResponse response2 = new PrepareResponse((byte)2,prepareRequest,new PrepareNumber((byte)2,2), null);
-		PrepareResponse response3 = new PrepareResponse((byte)3,prepareRequest,new PrepareNumber((byte)2,2), null);
-		PrepareResponse response4 = new PrepareResponse((byte)4,prepareRequest,new PrepareNumber((byte)2,2), null);
+		PrepareResponse response1 = new PrepareResponse((byte)1,prepareRequest,true,new PrepareNumber((byte)2,2), null);
+		PrepareResponse response2 = new PrepareResponse((byte)2,prepareRequest,true,new PrepareNumber((byte)2,2), null);
+		PrepareResponse response3 = new PrepareResponse((byte)3,prepareRequest,true,new PrepareNumber((byte)2,2), null);
+		PrepareResponse response4 = new PrepareResponse((byte)4,prepareRequest,true,new PrepareNumber((byte)2,2), null);
 		
 		Assert.isFalse(proposer.processPrepareResponse(response1));
 		Assert.isFalse(proposer.processPrepareResponse(response2));
@@ -168,22 +168,22 @@ public class MainTests {
 		PrepareRequest prepareRequest = proposer.createPrepareRequest(0);
 		
 		// Simulate the responses
-		PrepareResponse response1 = new PrepareResponse((byte)1,prepareRequest,new PrepareNumber((byte)1,0), null);
-		PrepareResponse response2 = new PrepareResponse((byte)2,prepareRequest,new PrepareNumber((byte)2,0), null);
-		PrepareResponse response3 = new PrepareResponse((byte)3,prepareRequest,new PrepareNumber((byte)2,2), null);
-		PrepareResponse response4 = new PrepareResponse((byte)4,prepareRequest,new PrepareNumber((byte)2,2), null);
+		PrepareResponse response1 = new PrepareResponse((byte)1,prepareRequest,false,new PrepareNumber((byte)1,0), null);
+		PrepareResponse response2 = new PrepareResponse((byte)2,prepareRequest,false,new PrepareNumber((byte)2,0), null);
+		PrepareResponse response3 = new PrepareResponse((byte)3,prepareRequest,false,new PrepareNumber((byte)2,2), null);
+		PrepareResponse response4 = new PrepareResponse((byte)4,prepareRequest,false,new PrepareNumber((byte)2,2), null);
 		
 		Assert.isFalse(proposer.processPrepareResponse(response1));
 		Assert.isFalse(proposer.processPrepareResponse(response2));
 		Assert.isFalse(proposer.processPrepareResponse(response3));
 		Assert.isFalse(proposer.processPrepareResponse(response4));
 		
-		Assert.isTrue(proposer.shouldResendPrepareRequest(0));
+		Assert.isTrue(proposer.shouldResendPrepareRequest2(0,0));
 		PrepareRequest prepareRequestResend = proposer.createPrepareRequest(0);
-		PrepareResponse responseResend1 = new PrepareResponse((byte)1,prepareRequestResend,new PrepareNumber((byte)1,0), null);
-		PrepareResponse responseResend2 = new PrepareResponse((byte)2,prepareRequestResend,new PrepareNumber((byte)2,0), null);
-		PrepareResponse responseResend3 = new PrepareResponse((byte)3,prepareRequestResend,new PrepareNumber((byte)3,2), null);
-		PrepareResponse responseResend4 = new PrepareResponse((byte)4,prepareRequestResend,new PrepareNumber((byte)4,2), null);
+		PrepareResponse responseResend1 = new PrepareResponse((byte)1,prepareRequestResend,true,new PrepareNumber((byte)1,0), null);
+		PrepareResponse responseResend2 = new PrepareResponse((byte)2,prepareRequestResend,true,new PrepareNumber((byte)2,0), null);
+		PrepareResponse responseResend3 = new PrepareResponse((byte)3,prepareRequestResend,true,new PrepareNumber((byte)3,2), null);
+		PrepareResponse responseResend4 = new PrepareResponse((byte)4,prepareRequestResend,true,new PrepareNumber((byte)4,2), null);
 
 		Assert.isFalse(proposer.processPrepareResponse(responseResend1));
 		Assert.isFalse(proposer.processPrepareResponse(responseResend2));
@@ -206,7 +206,7 @@ public class MainTests {
 	private static void valueTest() {
 		LearnedValues values = new LearnedValues();
 		Assert.isNull(values.getAt(0));
-		values.setAt(0, new LearnedValue(0, "abc", new PrepareNumber((byte)1,2)));
+		values.setAt(0, new LearnedValue(0, new PaxosValue((byte)0, "abc"), new PrepareNumber((byte)1,2)));
 		Assert.equals("abc", values.getAt(0).getContent());
 		print("valueTest Passed!");
 	}

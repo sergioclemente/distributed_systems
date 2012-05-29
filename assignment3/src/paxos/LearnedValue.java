@@ -4,10 +4,10 @@ import util.SerializationUtil;
 
 public class LearnedValue {
 	private int slotNumber;
-	private Object content;
+	private PaxosValue content;
 	private PrepareNumber number;
 	
-	public LearnedValue(int slotNumber, Object content, PrepareNumber number) {
+	public LearnedValue(int slotNumber, PaxosValue content, PrepareNumber number) {
 		this.setSlotNumber(slotNumber);
 		this.number = number;
 		this.content = content;
@@ -19,10 +19,10 @@ public class LearnedValue {
 	public void setNumber(PrepareNumber number) {
 		this.number = number;
 	}
-	public Object getContent() {
+	public PaxosValue getContent() {
 		return content;
 	}
-	public void setContent(Object content) {
+	public void setContent(PaxosValue content) {
 		this.content = content;
 	}
 

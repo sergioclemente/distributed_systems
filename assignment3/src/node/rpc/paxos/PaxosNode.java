@@ -1,5 +1,6 @@
 package node.rpc.paxos;
 
+import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -9,25 +10,25 @@ import java.util.Vector;
 
 import org.apache.commons.lang.math.RandomUtils;
 
+import edu.washington.cs.cse490h.lib.Callback;
+import edu.washington.cs.cse490h.lib.Utility;
+
 import paxos.AcceptRequest;
 import paxos.AcceptResponse;
 import paxos.Acceptor;
 import paxos.GetAcceptedValueRequest;
 import paxos.LearnRequest;
 import paxos.Learner;
+import paxos.PaxosValue;
+import paxos.PrepareNumber;
 import paxos.PrepareRequest;
 import paxos.PrepareResponse;
 import paxos.Proposer;
 import util.NodeSerialization;
 import node.rpc.RPCException;
 import node.rpc.RPCNode;
-<<<<<<< HEAD
 import node.storage.StorageSystemServer;
 import node.rpc.Skel_StorageServer;
-=======
-import node.rpc.Skel_StorageServer;
-import node.storage.StorageSystemServer;
->>>>>>> 19f9b27856bd1ee8ce548e496d700e9274f8991d
 
 public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILearnerReply, ILearner {
 	private ProposerSystem proposerSystem;
@@ -36,14 +37,8 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 	private StorageSystemServer storageSystem;
 	
 	private final int[] PROPOSER_ADDRESSES = {0,1,2}; //,3,4
-<<<<<<< HEAD
 	private final int[] ACCEPTOR_ADDRESSES = {0,1,2}; //{5,6,7}; //,8,9
 	private final int[] LEARNER_ADDRESSES  = {0,1,2}; //{10}; // ,11,12,13,14
-=======
-	private final int[] ACCEPTOR_ADDRESSES = {5,6,7}; //,8,9
-	private final int[] LEARNER_ADDRESSES = {10}; // ,11,12,13,14
-
->>>>>>> 19f9b27856bd1ee8ce548e496d700e9274f8991d
 	
 	public PaxosNode() {
 		super(false); // do not use reliable transport
@@ -111,7 +106,7 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 		if (methodName.equals("prepare")) {
 			this.proposerSystem.prepare(Integer.parseInt(parts[1]));
 		} else if (methodName.equals("accept")) {
-			this.proposerSystem.accept(Integer.parseInt(parts[1]), parts[2]);
+			this.proposerSystem.accept(Integer.parseInt(parts[1]), new PaxosValue((byte)this.addr, parts[2]));
 		} else if (methodName.equals("execute_command")) {
 			this.proposerSystem.executeCommand(command.replaceFirst("execute_command ", ""));
 		}
@@ -151,7 +146,7 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 		boolean learned = this.learnerSystem.processLearnRequest(request);
 		if (learned) {
 			try	{
-				this.storageSystem.executeCommand((String)request.getLearnedValue().getContent());	
+				this.storageSystem.executeCommand(request.getLearnedValue().getContent().getCommand());	
 			} catch (RPCException ex) {
 				ex.printStackTrace();
 			}
@@ -175,7 +170,7 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 		
 		if (acceptResponse.getAccepted()) {
 			// Notify the learners
-			this.acceptorSystem.learn(request.getPrepareRequest().getSlotNumber());
+			this.acceptorSystem.learn(request.getPrepareRequest().getSlotNumber(), request.getValue());
 		}
 		
 		return acceptResponse;
@@ -198,60 +193,120 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 		return Arrays.binarySearch(LEARNER_ADDRESSES, this.addr) >= 0;
 	}
 	
-	class ProposerSystem {
+	
+	public class ProposerSystem {
 		private PaxosNode paxosNode;
 		private Proposer proposer;
 		private int currentSlot;
 		private Vector<IAcceptor> acceptors = new Vector<IAcceptor>();
 		private Hashtable<Integer, String> mapSlotToCommands = new Hashtable<Integer, String>();
-		
 		private HashSet<Integer> slotsAlreadyAccepted = new HashSet<Integer>();
- 
+		private Vector<String> commandQueue = new Vector<String>();
+		private String currentCommand = null;
+		private Method prepareTimeoutCallback;
+		private Method prepareResubmitCallback;
+		private Hashtable<Integer, PrepareNumber> acceptsSent = new Hashtable<Integer, PrepareNumber>();
 		
 		public ProposerSystem(byte hostIdentifier, PaxosNode paxosNode) {
 			this.proposer = new Proposer(hostIdentifier, ACCEPTOR_ADDRESSES.length);
 			this.paxosNode = paxosNode;
-		}
-		
-		public void processAcceptResponse(AcceptResponse response) {
-			this.proposer.processAcceptResponse(response);
 			
-			boolean accepted = response.getMaxNumberPreparedSoFar().getValue() 
-					== response.getPrepareRequest().getNumber().getValue();
-			
-			// TODO: handle timeouts
-			if (!accepted) {
-				reExecuteCommand(response.getPrepareRequest());
+			try {
+				this.prepareTimeoutCallback = Callback.getMethod("onPrepareTimeout", this, new String[] { "java.lang.Integer", "java.lang.Integer" });
+				this.prepareResubmitCallback = Callback.getMethod("onPrepareResubmit", this, new String[] { "java.lang.Integer" });
+			} catch (Exception e) {
+				e.printStackTrace();
 			}
 		}
-
+		
 		public void processPrepareResponse(PrepareResponse response) {
 			boolean hasPrepareQuorum = this.proposer.processPrepareResponse(response);
 			int slotNumber = response.getPrepareRequest().getSlotNumber();
 			
-			// TODO: handle timeouts & drops
 			if (hasPrepareQuorum) {
-				// Got quorum, now we can send accept requests 
-				if (this.mapSlotToCommands.containsKey(slotNumber) && !this.slotsAlreadyAccepted.contains(slotNumber)) {
-					this.slotsAlreadyAccepted.add(slotNumber);
-					String command = this.mapSlotToCommands.get(slotNumber);
-					this.accept(slotNumber, command);
-				}
-			} else {
-				if (this.proposer.shouldResendPrepareRequest(slotNumber)) {
-					this.prepare(slotNumber);
+				// Got quorum, we can now send accept requests if we haven't done so yet.
+				boolean sendAccept = false;
+				
+				if (!this.acceptsSent.containsKey(slotNumber)) {
+					// First time sending accepts for this slot
+					sendAccept = true;
 				} else {
-					if (this.proposer.getFirstAcceptedValue(slotNumber) != null) {
-						// try on next slot
-						this.reExecuteCommand(response.getPrepareRequest());
+					PrepareNumber pnAccept = this.acceptsSent.get(slotNumber);
+					PrepareNumber pnResponse = response.getPrepareRequest().getNumber();
+					
+					if (pnResponse.compareTo(pnAccept) > 0) {
+						// Response number is higher than the last accept sent, so send again
+						sendAccept = true;
 					}
 				}
+				
+				if (sendAccept) {
+					// Find out the value associated with the highest numbered prepare response
+					PaxosValue value = this.proposer.getAcceptedValueIfAny(slotNumber);
+					
+					if (value == null) {
+						// No value has been proposed yet, therefore we can propose the
+						// command at the front of the queue.
+						value = new PaxosValue(this.proposer.getIdentifier(), this.currentCommand);
+					}
+	
+					this.accept(slotNumber, value);
+					this.acceptsSent.put(slotNumber, response.getPrepareRequest().getNumber().clone());
+				}
+			} else {
+			
+				// Here, either (1) we don't have enough responses (yet) or (2) we don't have enough promises.
+				// (1): If we don't have enough responses, we don't do anything and simply keep waiting up to 
+				// some timeout. 'onPrepareTimeout()' will be called when the timeout expires and, if
+				// at that time we still didn't receive enough responses, we'll resend the prepare request.
+				// (2): If we don't have enough promises, we are competing with another proposer for this
+				// slot. We'll back out for a random time interval and then resubmit the prepare request.
+				
+				if (this.proposer.hasEnoughResponses(slotNumber)) {
+					// If we have enough responses but not prepare quorum, we should retry after
+					// a random timeout.
+					Object[] args = new Object[] { slotNumber };
+					Callback cb = new Callback(this.prepareResubmitCallback, this, args);
+					this.paxosNode.addTimeout(cb, Utility.getRNG().nextInt(4));
+				} else {
+					// Not enough responses yet, so keep waiting.
+				}
 			}
+		}
+
+		public void processAcceptResponse(AcceptResponse response) {
+			int slotNumber = response.getPrepareRequest().getSlotNumber();
+			boolean hasAcceptQuorum = this.proposer.processAcceptResponse(response);
+			
+			if (hasAcceptQuorum) {
+				// A value has been chosen. If this is the value we proposed, we can
+				// move on to the next command in the queue. Otherwise, we need to
+				// start a new Paxos round and try to get our current command accepted.
+				
+				// TODO: implement
+
+				this.currentCommand = null;
+				
+			} else {
+				// Here, either (1) we don't have enough accept responses (yet) or
+				// (2) the proposal was not accepted.
+				
+				if (this.proposer.hasEnoughAcceptResponses(slotNumber)) {
+					// Proposal not accepted, we should retry after a random timeout
+					Object[] args = new Object[] { slotNumber };
+					Callback cb = new Callback(this.prepareResubmitCallback, this, args);
+					this.paxosNode.addTimeout(cb, Utility.getRNG().nextInt(4));
+				} else {
+					// Not enough responses yet, so keep waiting.
+				}
+			}
+				
 		}
 
 		private void reExecuteCommand(PrepareRequest request) {
 			int slotNumber = request.getSlotNumber();
 			
+			// TODO-luciano: review and fix
 			if (this.mapSlotToCommands.containsKey(slotNumber)) {
 				String command = this.mapSlotToCommands.get(slotNumber);
 				this.mapSlotToCommands.remove(slotNumber);
@@ -261,7 +316,19 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 
 		public void executeCommand(String command) {
 			this.mapSlotToCommands.put(this.currentSlot, command);
-			this.prepare(currentSlot++);
+			
+			// Queue the current command.
+			// Commands are processed one at a time in FIFO order, so that serialization
+			// is preserved among commands sent to the same proposer.
+			this.commandQueue.add(command);
+			
+			if (this.currentCommand == null) {
+				// Get the next command from the queue
+				this.currentCommand = this.commandQueue.remove(0);
+				
+				// Start a new Paxos round for this command
+				this.prepare(this.currentSlot++);
+			}
 		}
 
 		public void prepare(int slotNumber) {
@@ -272,9 +339,16 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 				// The prepare return from the stub is null
 				acceptor.prepare(request);
 			}
+			
+			// Schedule a timeout so that we can issue a new prepare request
+			// if not enough responses are received.
+			// We use an arbitrary timeout of 8 + random(4) ticks.
+			Object[] args = new Object[] { slotNumber, request.getNumber().getSequenceNumber() };
+			Callback cb = new Callback(this.prepareTimeoutCallback, this, args);
+			this.paxosNode.addTimeout(cb, 8 + Utility.getRNG().nextInt(4));
 		}
 		
-		public void accept(int slotNumber, String value) {
+		public void accept(int slotNumber, PaxosValue value) {
 			this.paxosNode.info("accept() on slot " + slotNumber);
 			AcceptRequest request = this.proposer.createAcceptRequest(slotNumber, value);
 			
@@ -293,9 +367,28 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 		public Proposer getProposer() {
 			return this.proposer;
 		}
+		
+		/**
+		 * onPrepareTimeout() is called after some period of time so that we can check the status
+		 * of the given slot and make sure that the prepare request made progress (i.e. it 
+		 * received enough replies to either re-submit or move to the accept phase).
+		 */
+		public void onPrepareTimeout(Integer slotNumber, Integer sequenceNumber) {
+			if (this.proposer.shouldResendPrepareRequest2(slotNumber, sequenceNumber)) {
+				this.prepare(slotNumber);
+			}
+		}
+		
+		/**
+		 * onPrepareResubmit() is called after a random time interval when we decided that we
+		 * should resubmit the given prepare request.
+		 */
+		public void onPrepareResubmit(Integer slotNumber) {
+			this.prepare(slotNumber);
+		}
 	}
 	
-	class AcceptorSystem {
+	public class AcceptorSystem {
 		private Acceptor acceptor;
 		private PaxosNode paxosNode;
 		private Map<Integer, ILearner> learners = new HashMap<Integer, ILearner>();
@@ -306,7 +399,7 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 		}
 		
 		public void getAcceptedValue(int slotNumber, int learner) {
-			LearnRequest request = this.acceptor.createLearnRequest(slotNumber);
+			LearnRequest request = this.acceptor.createLearnRequest(slotNumber, null /* TODO: fix */);
 			
 			if (learners.containsKey(learner))
 			{
@@ -314,9 +407,9 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 			}
 		}
 
-		public void learn(int slotNumber) {
+		public void learn(int slotNumber, PaxosValue value) {
 			this.paxosNode.info("learn() on slot " + slotNumber);
-			LearnRequest request = this.acceptor.createLearnRequest(slotNumber);
+			LearnRequest request = this.acceptor.createLearnRequest(slotNumber, value);
 			
 			for (ILearner learner: learners.values()) {
 				// accept return from the stub is null
@@ -336,7 +429,7 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 		}
 	}
 	
-	class LearnerSystem {
+	public class LearnerSystem {
 		private Learner learner;
 		private PaxosNode paxosNode;
 		private Vector<IAcceptor> acceptors = new Vector<IAcceptor>();

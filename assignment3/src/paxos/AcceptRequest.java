@@ -4,9 +4,9 @@ import util.SerializationUtil;
 
 public class AcceptRequest {
 	private PrepareRequest prepareRequest;
-	private Object value;
+	private PaxosValue value;
 	
-	public AcceptRequest(PrepareRequest prepareRequest, Object value) {
+	public AcceptRequest(PrepareRequest prepareRequest, PaxosValue value) {
 		this.prepareRequest = prepareRequest;
 		this.value = value;
 	}
@@ -15,7 +15,7 @@ public class AcceptRequest {
 		return prepareRequest;
 	}
 
-	public Object getValue() {
+	public PaxosValue getValue() {
 		return this.value;
 	}
 	

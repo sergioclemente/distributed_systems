@@ -55,15 +55,15 @@ public class TestDriver {
 		}
 	}
 	
-	public boolean accept(int proposeServer, int slotNumber, Object value) {
+	public boolean accept(int proposeServer, int slotNumber, String value) {
 		return accept(proposeServer, slotNumber, value, generateArray(this.acceptors.size()));
 	}
 	
 	
-	public boolean accept(int proposeServer, int slotNumber, Object value, int[] acceptServers) {
+	public boolean accept(int proposeServer, int slotNumber, String value, int[] acceptServers) {
 		Proposer proposer = this.proposers.get(proposeServer);
 		
-		AcceptRequest request = proposer.createAcceptRequest(slotNumber, value);
+		AcceptRequest request = proposer.createAcceptRequest(slotNumber, new PaxosValue((byte) proposeServer, value));
 		
 		long prepareNumberValue = request.getPrepareRequest().getNumber().getValue();
 		
@@ -71,7 +71,7 @@ public class TestDriver {
 		for (int idx : acceptServers) {
 			Acceptor acceptor = this.acceptors.get(idx);
 			AcceptResponse acceptResponse = acceptor.processAccept(request);
-			accepted = accepted && acceptResponse.getMaxNumberPreparedSoFar().getValue() == prepareNumberValue;
+			accepted = accepted && acceptResponse.getAcceptedProposalNumber().getValue() == prepareNumberValue;
 			proposer.processAcceptResponse(acceptResponse);
 		}
 		
@@ -84,9 +84,8 @@ public class TestDriver {
 	
 	public void learn(int acceptServer, int slotNumber, int[] learnServers) {
 		Acceptor acceptor = this.acceptors.get(acceptServer);
+		LearnRequest request = acceptor.createLearnRequest(slotNumber, null);
 		
-		LearnRequest request = acceptor.createLearnRequest(slotNumber);
-
 		for (int idx : learnServers) {
 			Learner learner = this.learners.get(idx);
 			learner.processLearnRequest(request);

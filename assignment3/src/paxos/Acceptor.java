@@ -1,72 +1,116 @@
 package paxos;
 
+import java.util.Hashtable;
 import util.ISerialization;
 
 public class Acceptor {
 	private byte hostIdentifier;
-	private PrepareNumber maxNumberPrepared;
-	private LearnedValues learnedValues;
 	private ISerialization serialization;
-	
+	private Hashtable<Integer, PrepareNumber> promisedNumbers;
+	private Hashtable<Integer, PrepareNumber> acceptedNumbers;
+	private Hashtable<Integer, PaxosValue> acceptedValues;
+
 	public Acceptor(byte hostIdentifier, ISerialization serialization) {
 		this.hostIdentifier = hostIdentifier;
 		this.serialization = serialization;
-		
+
 		if (this.serialization != null) {
-			this.maxNumberPrepared = (PrepareNumber)this.serialization.restoreState("maxNumberPrepared");			
-			this.learnedValues = (LearnedValues)this.serialization.restoreState("proposedValues");
-		}
-		
-		if (this.maxNumberPrepared == null) {
-			this.maxNumberPrepared = new PrepareNumber((byte)0, 0);
-		}
-		if (this.learnedValues == null) {
-			this.learnedValues = new LearnedValues();
+			this.promisedNumbers = (Hashtable<Integer, PrepareNumber>) this.serialization.restoreState("promisedNumbers");
+			if (this.promisedNumbers == null)
+				this.promisedNumbers = new Hashtable<Integer, PrepareNumber>();
+			
+			this.acceptedNumbers = (Hashtable<Integer, PrepareNumber>) this.serialization.restoreState("acceptedNumbers");
+			if (this.acceptedNumbers == null)
+				this.acceptedNumbers = new Hashtable<Integer, PrepareNumber>();
+			
+			this.acceptedValues = (Hashtable<Integer, PaxosValue>) this.serialization.restoreState("acceptedValues");
+			if (this.acceptedValues == null)
+				this.acceptedValues = new Hashtable<Integer, PaxosValue>();
+			
+		} else {
+			this.promisedNumbers = new Hashtable<Integer, PrepareNumber>();
+			this.acceptedNumbers = new Hashtable<Integer, PrepareNumber>();
+			this.acceptedValues = new Hashtable<Integer, PaxosValue>();
 		}
 	}
 
-	public PrepareResponse processPrepareRequest(PrepareRequest prepareRequest) {		
-		if (prepareRequest.getNumber().getValue() > this.maxNumberPrepared.getValue()) {
-			this.maxNumberPrepared = prepareRequest.getNumber();
+	/**
+	 * processPrepareRequest()
+	 */
+	public PrepareResponse processPrepareRequest(PrepareRequest prepareRequest) {
+		boolean promise;
+		int slotNumber = prepareRequest.getSlotNumber();
+
+		if (this.promisedNumbers.containsKey(slotNumber)) {
+			PrepareNumber pn = this.promisedNumbers.get(slotNumber);
+			if (pn.getValue() > prepareRequest.getNumber().getValue()) {
+				// We've already promised to accept a higher numbered request,
+				// so deny this one
+				promise = false;
+			} else {
+				// This is the highest numbered request seen so far, remember it
+				this.promisedNumbers.put(slotNumber, prepareRequest.getNumber());
+				promise = true;
+			}
+		} else {
+			// This is the first request, so promise to accept it
+			this.promisedNumbers.put(slotNumber, prepareRequest.getNumber());
+			promise = true;
 		}
 
-		// Get any learned value (if any)
-		LearnedValue learnedValue = this.learnedValues.getAt(prepareRequest.getSlotNumber());
-		
-		PrepareResponse prepareResponse = new PrepareResponse(this.hostIdentifier, prepareRequest, this.maxNumberPrepared.clone(), learnedValue != null ? learnedValue.getContent() : null);
-		
-		if (this.serialization != null) {
-			this.serialization.saveState("maxNumberPrepared", this.maxNumberPrepared);
+		PaxosValue currentAcceptedValue = null;
+		PrepareNumber currentAcceptedProposal = null;
+		if (this.acceptedValues.containsKey(slotNumber)) {
+			currentAcceptedValue = this.acceptedValues.get(slotNumber);
+			currentAcceptedProposal = this.acceptedNumbers.get(slotNumber);
 		}
-		
+
+		PrepareResponse prepareResponse;
+		prepareResponse = new PrepareResponse(this.hostIdentifier,
+				prepareRequest, promise, currentAcceptedProposal,
+				currentAcceptedValue);
+
+		if (this.serialization != null) {
+			this.serialization.saveState("prepareNumbers", this.promisedNumbers);
+		}
+
 		return prepareResponse;
 	}
-	
+
+	/**
+	 * processAccept()
+	 */
 	public AcceptResponse processAccept(AcceptRequest acceptRequest) {
 		PrepareRequest prepareRequest = acceptRequest.getPrepareRequest();
-		
+		PrepareNumber requestNumber = prepareRequest.getNumber();
+		int slotNumber = prepareRequest.getSlotNumber();
+
+		if (!this.promisedNumbers.containsKey(slotNumber)) {
+			throw new PaxosException(PaxosException.UNEXPECTED_SLOT_NUMBER);
+		}
+
 		boolean accepted = false;
-		if (prepareRequest.getNumber().getValue() >= this.maxNumberPrepared.getValue()) {
-			this.learnedValues.setAt(prepareRequest.getSlotNumber(), new LearnedValue(prepareRequest.getSlotNumber(), acceptRequest.getValue(), prepareRequest.getNumber()));
+		if (requestNumber.getValue() >= this.promisedNumbers.get(slotNumber).getValue()) {
+			this.acceptedValues.put(slotNumber, acceptRequest.getValue());
+			this.acceptedNumbers.put(slotNumber, requestNumber.clone());
+			accepted = true;
 			
 			if (this.serialization != null) {
-				this.serialization.saveState("proposedValues", this.learnedValues);
+				this.serialization.saveState("acceptedValues", this.acceptedValues);
+				this.serialization.saveState("acceptedNumbers", this.acceptedNumbers);
 			}
-			accepted = true;
 		}
-		
-		return new AcceptResponse(prepareRequest, this.maxNumberPrepared.clone(), accepted);
+
+		return new AcceptResponse(this.hostIdentifier, prepareRequest,
+				requestNumber.clone(), accepted);
 	}
-	
-	public LearnRequest createLearnRequest(int slotNumber) {
-		LearnedValue learnedValue = this.learnedValues.getAt(slotNumber);
-		if (learnedValue == null) {
-			throw new PaxosException(PaxosException.VALUE_WAS_NOT_LEARNED);
-		}
+
+	public LearnRequest createLearnRequest(int slotNumber, PaxosValue value) {
+		LearnedValue learnedValue = new LearnedValue(slotNumber, value, null); 
 		return new LearnRequest(slotNumber, learnedValue);
 	}
-	
+
 	public LearnedValue getLearnedValue(int slotNumber) {
-		return this.learnedValues.getAt(slotNumber);
+		return new LearnedValue(slotNumber, this.acceptedValues.get(slotNumber), null);
 	}
 }

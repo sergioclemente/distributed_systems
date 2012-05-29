@@ -38,7 +38,7 @@ public class PrepareNumber implements  Comparable<PrepareNumber> {
 	@Override
 	public int compareTo(PrepareNumber prepareNumber) {
 		if (prepareNumber == null) {
-			return -1;
+			return 1;
 		} else {
 			if (this.getValue() > prepareNumber.getValue()) {
 				return +1;

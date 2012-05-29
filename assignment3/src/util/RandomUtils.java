@@ -1,7 +1,4 @@
 package util;
-
-import java.util.Random;
-
 import edu.washington.cs.cse490h.lib.Utility;
 
 public class RandomUtils {
