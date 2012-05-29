@@ -57,4 +57,17 @@ public class Learner {
 	public LearnedValue getLearnedValue(int slotNumber) {
 		return this.learnedValues.getAt(slotNumber);
 	}
+	
+	public boolean shouldStartLearningProcess(int slotNumber) {
+		//TODO-licavalc: need to deal with the case where we are in the middle or learning but didn't get all answers
+		
+		// Don't know the value and haven't started learning
+		if (!numAcceptNotifications.containsKey(slotNumber) && learnedValues.getAt(slotNumber) == null) {
+			numAcceptNotifications.put(slotNumber, 0);
+			
+			return true;
+		}
+		
+		return false;
+	}
 }

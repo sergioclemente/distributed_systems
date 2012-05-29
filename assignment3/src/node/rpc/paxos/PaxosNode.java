@@ -1,8 +1,10 @@
 package node.rpc.paxos;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Hashtable;
+import java.util.Map;
 import java.util.Vector;
 
 import org.apache.commons.lang.math.RandomUtils;
@@ -10,6 +12,7 @@ import org.apache.commons.lang.math.RandomUtils;
 import paxos.AcceptRequest;
 import paxos.AcceptResponse;
 import paxos.Acceptor;
+import paxos.GetAcceptedValueRequest;
 import paxos.LearnRequest;
 import paxos.Learner;
 import paxos.PrepareRequest;
@@ -60,6 +63,11 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 			this.info("Starting learner node on address " + this.addr);
 			this.learnerSystem = new LearnerSystem((byte)this.addr, this);
 			
+			// Connect to the acceptors
+			for (int acceptorAddr : ACCEPTOR_ADDRESSES) {
+				this.learnerSystem.connectToAcceptor(acceptorAddr);
+			}
+			
 			Skel_LearnerServer skel = new Skel_LearnerServer(this);
 			skel.bindMethods(this);
 		}
@@ -100,7 +108,7 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 	
 	@Override
 	public void learn(LearnRequest request) {
-		this.learnerSystem.getLearner().processLearnRequest(request);
+		this.learnerSystem.processLearnRequest(request);
 	}
 	
 	@Override
@@ -118,6 +126,11 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 		}
 		
 		return acceptResponse;
+	}
+	
+	@Override
+	public void getAcceptedValue(GetAcceptedValueRequest request) {
+		this.acceptorSystem.getAcceptedValue(request.getSlotNumber(), request.getLearner());	
 	}
 	
 	private boolean isProposer() {
@@ -232,18 +245,27 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 	class AcceptorSystem {
 		private Acceptor acceptor;
 		private PaxosNode paxosNode;
-		private Vector<ILearner> learners = new Vector<ILearner>();
+		private Map<Integer, ILearner> learners = new HashMap<Integer, ILearner>();
 		
 		public AcceptorSystem(byte hostIdentifier, PaxosNode paxosNode) {
 			this.acceptor = new Acceptor(hostIdentifier, null); // TODO: missing serialization
 			this.paxosNode = paxosNode;
 		}
 		
+		public void getAcceptedValue(int slotNumber, int learner) {
+			LearnRequest request = this.acceptor.createLearnRequest(slotNumber);
+			
+			if (learners.containsKey(learner))
+			{
+				learners.get(learner).learn(request);
+			}
+		}
+
 		public void learn(int slotNumber) {
 			this.paxosNode.info("learn() on slot " + slotNumber);
 			LearnRequest request = this.acceptor.createLearnRequest(slotNumber);
 			
-			for (ILearner learner: learners) {
+			for (ILearner learner: learners.values()) {
 				// accept return from the stub is null
 				learner.learn(request);
 			}
@@ -253,7 +275,7 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 		public void connectToLearner(int addr) {
 			this.paxosNode.info("connecting to learner address " + addr);
 			Stub_LearnerServer stub = new Stub_LearnerServer(this.paxosNode, addr, this.paxosNode);
-			this.learners.add(stub);
+			this.learners.put(addr, stub);
 		}
 
 		public Acceptor getAcceptor() {
@@ -264,14 +286,38 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 	class LearnerSystem {
 		private Learner learner;
 		private PaxosNode paxosNode;
+		private Vector<IAcceptor> acceptors = new Vector<IAcceptor>();
 		
 		public LearnerSystem(byte hostIdentifier, PaxosNode paxosNode) {
 			this.learner = new Learner(hostIdentifier, paxosNode.proposerSystem.getProposer().getNumberOfAcceptors());
 			this.paxosNode = paxosNode;
 		}
-		
-		public Learner getLearner() {
-			return this.learner;
+
+		public void processLearnRequest(LearnRequest request) {
+			int currentSlotNumber = request.getSlotNumber();
+			
+			this.learner.processLearnRequest(request);
+			
+			for (int i = currentSlotNumber - 1; i >= 0; i--) {
+				if (this.learner.shouldStartLearningProcess(i))
+				{
+					startLearningProcess(i);
+				}
+			}
 		}
-	}
+		
+		public void connectToAcceptor(int addr) {
+			this.paxosNode.info("connecting to acceptor address " + addr);
+			Stub_AcceptorServer stub = new Stub_AcceptorServer(this.paxosNode, addr, this.paxosNode);
+			this.acceptors.add(stub);
+		}
+		
+		private void startLearningProcess(int slotNumber) {
+			GetAcceptedValueRequest request = new GetAcceptedValueRequest(slotNumber, paxosNode.addr);
+			
+			for (IAcceptor acceptor : acceptors) {
+				acceptor.getAcceptedValue(request);
+			}
+		}
+	}	
 }

@@ -32,6 +32,12 @@ public class Skel_AcceptorServer extends RPCSkeleton {
 			AcceptRequest request = (AcceptRequest)SerializationUtil.deserialize(methodArgs.get(0), AcceptRequest.class);
 			content = SerializationUtil.serialize(acceptor.accept(request));
 		}
+		else if (methodName.compareToIgnoreCase("getAcceptedValue") == 0)
+		{
+			GetAcceptedValueRequest request = 
+					(GetAcceptedValueRequest)SerializationUtil.deserialize(methodArgs.get(0), GetAcceptedValueRequest.class);
+			acceptor.getAcceptedValue(request);
+		}
 		else
 		{
 			assert false;
@@ -44,5 +50,6 @@ public class Skel_AcceptorServer extends RPCSkeleton {
 	protected void bindMethods(RPCNode node) {
 		node.bindRpcMethod("prepare", this);
 		node.bindRpcMethod("accept", this);
+		node.bindRpcMethod("getAcceptedValue", this);
 	}
 }
