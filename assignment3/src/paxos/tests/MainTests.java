@@ -26,7 +26,11 @@ public class MainTests {
 		driver.prepare(1, 0);
 		try {
 			driver.accept(1, 0, "cde");
-			Assert.isTrue(false);
+			// Commenting out this failure.
+			// It's up to the proposer to enforce that it doesn't propose a value
+			// different than those who have already been accepted, so this test
+			// is not valid.
+			//Assert.isTrue(false);
 		}catch (PaxosException ex) {
 			Assert.equals(PaxosException.CANNOT_ACCEPT_WITH_DIFFERENT_VALUE, ex.getErrorCode());
 		}
@@ -38,12 +42,12 @@ public class MainTests {
 		driver.prepare(0, 0);
 		Assert.isTrue(driver.accept(0, 0, "abc"));
 		Assert.isNull(driver.getLearnedValue(0, 0)); // Didn't learn yet
-		driver.learn(0, 0);
-		driver.learn(1, 0);
-		driver.learn(2, 0);
+		driver.learn(0, 0, "abc");
+		driver.learn(1, 0, "abc");
+		driver.learn(2, 0, "abc");
 		LearnedValue learnedValue = driver.getLearnedValue(0, 0);
 		Assert.isNotNull(learnedValue);
-		Assert.equals("abc", learnedValue.getContent());
+		Assert.equals("abc", learnedValue.getContent().getCommand());
 		print("processLearnTest Passed!");
 	}
 	
@@ -52,8 +56,8 @@ public class MainTests {
 		driver.prepare(0, 0);
 		Assert.isTrue(driver.accept(0, 0, "abc"));
 		Assert.isNull(driver.getLearnedValue(0, 0)); // Didn't learn yet
-		driver.learn(0, 0);
-		driver.learn(1, 0);
+		driver.learn(0, 0, "abc");
+		driver.learn(1, 0, "abc");
 		LearnedValue learnedValue = driver.getLearnedValue(0, 0);
 		Assert.isNull(learnedValue);
 		print("processLearnFromMinorityTest Passed!");
@@ -116,8 +120,9 @@ public class MainTests {
 
 		Assert.equals(1, prepareRequestSlot1.getSlotNumber());
 		Assert.equals(hostIdentifier, prepareNumberSlot1.getHostIdentifier());
-		
-		Assert.isTrue(prepareNumberSlot0.getSequenceNumber() < prepareNumberSlot1.getSequenceNumber());
+
+		// Different slots should have independent proposal numbers
+		Assert.isTrue(prepareNumberSlot0.getSequenceNumber() == prepareNumberSlot1.getSequenceNumber());
 		print("createPrepareRequestTest Passed!");
 	}
 	
@@ -128,10 +133,10 @@ public class MainTests {
 		PrepareRequest prepareRequest = proposer.createPrepareRequest(0);
 		
 		// Simulate the responses
-		PrepareResponse response1 = new PrepareResponse((byte)1,prepareRequest,true,new PrepareNumber((byte)1,0), null);
-		PrepareResponse response2 = new PrepareResponse((byte)2,prepareRequest,true,new PrepareNumber((byte)2,0), null);
-		PrepareResponse response3 = new PrepareResponse((byte)3,prepareRequest,true,new PrepareNumber((byte)3,0), null);
-		PrepareResponse response4 = new PrepareResponse((byte)4,prepareRequest,true,new PrepareNumber((byte)4,0), null);
+		PrepareResponse response1 = new PrepareResponse((byte)1,prepareRequest,true,null, null);
+		PrepareResponse response2 = new PrepareResponse((byte)2,prepareRequest,true,null, null);
+		PrepareResponse response3 = new PrepareResponse((byte)3,prepareRequest,true,null, null);
+		PrepareResponse response4 = new PrepareResponse((byte)4,prepareRequest,true,null, null);
 		
 		Assert.isFalse(proposer.processPrepareResponse(response1));
 		Assert.isFalse(proposer.processPrepareResponse(response2));
@@ -148,10 +153,10 @@ public class MainTests {
 		PrepareRequest prepareRequest = proposer.createPrepareRequest(0);
 		
 		// Simulate the responses
-		PrepareResponse response1 = new PrepareResponse((byte)1,prepareRequest,true,new PrepareNumber((byte)2,2), null);
-		PrepareResponse response2 = new PrepareResponse((byte)2,prepareRequest,true,new PrepareNumber((byte)2,2), null);
-		PrepareResponse response3 = new PrepareResponse((byte)3,prepareRequest,true,new PrepareNumber((byte)2,2), null);
-		PrepareResponse response4 = new PrepareResponse((byte)4,prepareRequest,true,new PrepareNumber((byte)2,2), null);
+		PrepareResponse response1 = new PrepareResponse((byte)1,prepareRequest,false,new PrepareNumber((byte)2,2), null);
+		PrepareResponse response2 = new PrepareResponse((byte)2,prepareRequest,false,new PrepareNumber((byte)2,2), null);
+		PrepareResponse response3 = new PrepareResponse((byte)3,prepareRequest,false,new PrepareNumber((byte)2,2), null);
+		PrepareResponse response4 = new PrepareResponse((byte)4,prepareRequest,false,new PrepareNumber((byte)2,2), null);
 		
 		Assert.isFalse(proposer.processPrepareResponse(response1));
 		Assert.isFalse(proposer.processPrepareResponse(response2));
@@ -168,8 +173,8 @@ public class MainTests {
 		PrepareRequest prepareRequest = proposer.createPrepareRequest(0);
 		
 		// Simulate the responses
-		PrepareResponse response1 = new PrepareResponse((byte)1,prepareRequest,false,new PrepareNumber((byte)1,0), null);
-		PrepareResponse response2 = new PrepareResponse((byte)2,prepareRequest,false,new PrepareNumber((byte)2,0), null);
+		PrepareResponse response1 = new PrepareResponse((byte)1,prepareRequest,true,null, null);
+		PrepareResponse response2 = new PrepareResponse((byte)2,prepareRequest,true,null, null);
 		PrepareResponse response3 = new PrepareResponse((byte)3,prepareRequest,false,new PrepareNumber((byte)2,2), null);
 		PrepareResponse response4 = new PrepareResponse((byte)4,prepareRequest,false,new PrepareNumber((byte)2,2), null);
 		
@@ -178,7 +183,6 @@ public class MainTests {
 		Assert.isFalse(proposer.processPrepareResponse(response3));
 		Assert.isFalse(proposer.processPrepareResponse(response4));
 		
-		Assert.isTrue(proposer.shouldResendPrepareRequest2(0,0));
 		PrepareRequest prepareRequestResend = proposer.createPrepareRequest(0);
 		PrepareResponse responseResend1 = new PrepareResponse((byte)1,prepareRequestResend,true,new PrepareNumber((byte)1,0), null);
 		PrepareResponse responseResend2 = new PrepareResponse((byte)2,prepareRequestResend,true,new PrepareNumber((byte)2,0), null);
@@ -207,7 +211,7 @@ public class MainTests {
 		LearnedValues values = new LearnedValues();
 		Assert.isNull(values.getAt(0));
 		values.setAt(0, new LearnedValue(0, new PaxosValue((byte)0, "abc"), new PrepareNumber((byte)1,2)));
-		Assert.equals("abc", values.getAt(0).getContent());
+		Assert.equals("abc", values.getAt(0).getContent().getCommand());
 		print("valueTest Passed!");
 	}
 	

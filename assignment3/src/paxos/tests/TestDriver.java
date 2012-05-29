@@ -71,20 +71,20 @@ public class TestDriver {
 		for (int idx : acceptServers) {
 			Acceptor acceptor = this.acceptors.get(idx);
 			AcceptResponse acceptResponse = acceptor.processAccept(request);
-			accepted = accepted && acceptResponse.getAcceptedProposalNumber().getValue() == prepareNumberValue;
+			accepted = accepted && acceptResponse.getAccepted();
 			proposer.processAcceptResponse(acceptResponse);
 		}
 		
 		return accepted;
 	}
 	
-	public void learn(int acceptServer, int slotNumber) {
-		this.learn(acceptServer, slotNumber, generateArray(this.learners.size()));
+	public void learn(int acceptServer, int slotNumber, String value) {
+		this.learn(acceptServer, slotNumber, value, generateArray(this.learners.size()));
 	}
 	
-	public void learn(int acceptServer, int slotNumber, int[] learnServers) {
+	public void learn(int acceptServer, int slotNumber, String value, int[] learnServers) {
 		Acceptor acceptor = this.acceptors.get(acceptServer);
-		LearnRequest request = acceptor.createLearnRequest(slotNumber, null);
+		LearnRequest request = acceptor.createLearnRequest(slotNumber, new PaxosValue((byte)0, value));
 		
 		for (int idx : learnServers) {
 			Learner learner = this.learners.get(idx);
