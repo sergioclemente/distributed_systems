@@ -6,4 +6,5 @@ import paxos.*;
 public interface IAcceptor {
 	PrepareResponse prepare(PrepareRequest request);
 	AcceptResponse accept(AcceptRequest request);
+	void getAcceptedValue(GetAcceptedValueRequest request);
 }

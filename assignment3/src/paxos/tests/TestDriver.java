@@ -25,7 +25,7 @@ public class TestDriver {
 		}
 		
 		for (int i = 0; i< numberOfLearners; i++) {
-			this.learners.add(new Learner(hostIdentifier++));
+			this.learners.add(new Learner(hostIdentifier++, this.acceptors.size()));
 		}
 	}
 	
@@ -87,7 +87,6 @@ public class TestDriver {
 		
 		LearnRequest request = acceptor.createLearnRequest(slotNumber);
 
-		
 		for (int idx : learnServers) {
 			Learner learner = this.learners.get(idx);
 			learner.processLearnRequest(request);

@@ -27,6 +27,12 @@ public class Stub_AcceptorServer extends RPCStub implements IAcceptor {
 		super.invoke("accept", serializedArguments);
 		return null;
 	}
+	
+	@Override
+	public void getAcceptedValue(GetAcceptedValueRequest request) {
+		String serializedArguments = SerializationUtil.serialize(request);
+		super.invoke("getAcceptedValue", serializedArguments);
+	}
 
 	@Override
 	protected void dispatchReply(int replyId, String methodName, int sender,
@@ -42,5 +48,5 @@ public class Stub_AcceptorServer extends RPCStub implements IAcceptor {
 		} else {
 			m_node.error("Unexpected method reply: " + methodName);
 		}
-	}
+	}	
 }

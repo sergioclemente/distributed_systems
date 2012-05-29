@@ -134,4 +134,9 @@ public class Proposer {
 		// Update the sequence number
 		this.currentPrepareNumber.setSequenceNumber(acceptResponse.getMaxNumberPreparedSoFar().getSequenceNumber()); 
 	}
+	
+	public int getNumberOfAcceptors()
+	{
+		return this.numberOfAcceptors;
+	}
 }
