@@ -15,6 +15,7 @@ import paxos.Learner;
 import paxos.PrepareRequest;
 import paxos.PrepareResponse;
 import paxos.Proposer;
+import util.NodeSerialization;
 import node.rpc.RPCException;
 import node.rpc.RPCNode;
 import node.rpc.Skel_StorageServer;
@@ -254,7 +255,7 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 		private Vector<ILearner> learners = new Vector<ILearner>();
 		
 		public AcceptorSystem(byte hostIdentifier, PaxosNode paxosNode) {
-			this.acceptor = new Acceptor(hostIdentifier, null); // TODO: missing serialization
+			this.acceptor = new Acceptor(hostIdentifier, new NodeSerialization(paxosNode, "serialization.txt"));
 			this.paxosNode = paxosNode;
 		}
 		

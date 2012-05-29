@@ -104,7 +104,7 @@ public class NodeUtility {
 	}
 	
 	// some helpers for transaction
-	private static String readAllLines(Node node, String filename)  {
+	public static String readAllLines(Node node, String filename)  {
 		try {
 			PersistentStorageReader psr = node.getReader(filename);
 			return readAll(psr);
