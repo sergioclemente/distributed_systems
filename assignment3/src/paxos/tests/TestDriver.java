@@ -84,7 +84,7 @@ public class TestDriver {
 	
 	public void learn(int acceptServer, int slotNumber, String value, int[] learnServers) {
 		Acceptor acceptor = this.acceptors.get(acceptServer);
-		LearnRequest request = acceptor.createLearnRequest(slotNumber, new PaxosValue((byte)0, value));
+		LearnRequest request = acceptor.createLearnRequest(slotNumber);
 		
 		for (int idx : learnServers) {
 			Learner learner = this.learners.get(idx);

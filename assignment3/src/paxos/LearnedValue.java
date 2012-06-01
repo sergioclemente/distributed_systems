@@ -16,12 +16,15 @@ public class LearnedValue {
 	public PrepareNumber getNumber() {
 		return number;
 	}
+	
 	public void setNumber(PrepareNumber number) {
 		this.number = number;
 	}
+	
 	public PaxosValue getContent() {
 		return content;
 	}
+	
 	public void setContent(PaxosValue content) {
 		this.content = content;
 	}
@@ -37,5 +40,10 @@ public class LearnedValue {
 	@Override
 	public String toString() {
 		return SerializationUtil.serialize(this);
+	}
+	
+	@Override
+	public int hashCode() {
+		return slotNumber ^ content.hashCode() ^ number.hashCode();
 	}
 }

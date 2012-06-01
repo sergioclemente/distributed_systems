@@ -1,6 +1,7 @@
 package paxos;
 
 import java.util.HashMap;
+import java.util.Hashtable;
 import java.util.Map;
 
 public class Learner {
@@ -19,43 +20,70 @@ public class Learner {
 	private int numberOfAcceptors;
 	
 	private byte hostIdentifier;
+	private Hashtable<Integer, Hashtable<Byte, LearnedValue>> acceptances;
 	
 	public Learner(byte hostIdentifier, int numberOfAcceptors) {
 		this.learnedValues = new LearnedValues();
 		this.hostIdentifier = hostIdentifier;
-		this.numAcceptNotifications = new HashMap<Integer, Integer>();
+		this.acceptances = new Hashtable<Integer, Hashtable<Byte, LearnedValue>>();
 		this.numberOfAcceptors = numberOfAcceptors;
 	}
 	
 	public boolean processLearnRequest(LearnRequest learnRequest) {
 		int slotNumber = learnRequest.getSlotNumber();
-		
+	
 		// We have already learned the value for this proposal number		
 		if (learnedValues.getAt(slotNumber) != null) {
 			return false;
 		}
-		
-		if (!numAcceptNotifications.containsKey(slotNumber))
-		{
-			numAcceptNotifications.put(slotNumber, 0);
+
+		Hashtable<Byte, LearnedValue> slotAcceptances;
+		if (!this.acceptances.containsKey(slotNumber)) {
+			slotAcceptances = new Hashtable<Byte, LearnedValue>();
+			this.acceptances.put(slotNumber, slotAcceptances);
+		} else {
+			slotAcceptances = this.acceptances.get(slotNumber);
 		}
 		
-		int countAcceptedNotifications = numAcceptNotifications.get(slotNumber);
-		countAcceptedNotifications++;
+		// Store / update the sender's accepted value
+		slotAcceptances.put(learnRequest.getHostIdentifier(), learnRequest.getLearnedValue());
+
+		Hashtable<PaxosValue, Integer> valueCounter = new Hashtable<PaxosValue, Integer>();
+		for (LearnedValue acceptedValue : slotAcceptances.values()) {
+			PaxosValue v = acceptedValue.getContent();
+			if (!valueCounter.containsKey(v)) {
+				valueCounter.put(v, 1);
+			} else {
+				valueCounter.put(v, valueCounter.get(v) + 1);
+			}
+		}
 		
-		if (countAcceptedNotifications > (numberOfAcceptors / 2))
-		{
-			numAcceptNotifications.remove(slotNumber);
-			learnedValues.setAt(slotNumber, learnRequest.getLearnedValue());
+		PaxosValue chosenValue = null;
+		for (PaxosValue v : valueCounter.keySet()) {
+			int count = valueCounter.get(v);
+			if (count > (numberOfAcceptors/2)) {
+				// Value was chosen
+				chosenValue = v;
+			}
+		}
+		
+		if (chosenValue != null) {
+			// TODO: store a valid LearnValue object?
+			LearnedValue hack = new LearnedValue(slotNumber, chosenValue, learnRequest.getLearnedValue().getNumber());
 			
-			//TODO-licavalc: maybe we should save to stable storage here.		
+			learnedValues.setAt(slotNumber, hack);
+			
+			System.out.println(String.format("##### L%d: Value was chosen: (%d,%s)", 
+					(int) this.hostIdentifier, (int) chosenValue.getProposer(), 
+					chosenValue.getCommand()));
 			return true;
-		}
-		else
-		{
-			numAcceptNotifications.put(slotNumber, countAcceptedNotifications);
+		} else {
+			System.out.println(String.format("##### L%d: Value NOT chosen yet",
+					(int) this.hostIdentifier));
 			return false;
 		}
+
+		//TODO-licavalc: maybe we should save to stable storage here.		
 	}
 
 	public LearnedValue getLearnedValue(int slotNumber) {
@@ -66,9 +94,8 @@ public class Learner {
 		//TODO-licavalc: need to deal with the case where we are in the middle or learning but didn't get all answers
 		
 		// Don't know the value and haven't started learning
-		if (!numAcceptNotifications.containsKey(slotNumber) && learnedValues.getAt(slotNumber) == null) {
-			numAcceptNotifications.put(slotNumber, 0);
-			
+		if (this.learnedValues.getAt(slotNumber) == null && !this.acceptances.containsKey(slotNumber)) {
+			this.acceptances.put(slotNumber, new Hashtable<Byte, LearnedValue>());
 			return true;
 		}
 		

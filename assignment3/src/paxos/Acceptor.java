@@ -105,12 +105,18 @@ public class Acceptor {
 				requestNumber.clone(), accepted);
 	}
 
-	public LearnRequest createLearnRequest(int slotNumber, PaxosValue value) {
-		LearnedValue learnedValue = new LearnedValue(slotNumber, value, null); 
-		return new LearnRequest(slotNumber, learnedValue);
+	/**
+	 * createLearnRequest()
+	 */
+	public LearnRequest createLearnRequest(int slotNumber) {
+		if (!this.acceptedValues.containsKey(slotNumber)) {
+			throw new PaxosException(PaxosException.VALUE_IS_NULL);
+		}
+		
+		PaxosValue value = this.acceptedValues.get(slotNumber);
+		PrepareNumber pn = this.acceptedNumbers.get(slotNumber);
+		LearnedValue learnedValue = new LearnedValue(slotNumber, value, pn); 
+		return new LearnRequest(slotNumber, this.hostIdentifier, learnedValue);
 	}
 
-	public LearnedValue getLearnedValue(int slotNumber) {
-		return new LearnedValue(slotNumber, this.acceptedValues.get(slotNumber), null);
-	}
 }

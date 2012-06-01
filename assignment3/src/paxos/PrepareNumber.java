@@ -2,7 +2,7 @@ package paxos;
 
 import util.SerializationUtil;
 
-public class PrepareNumber implements  Comparable<PrepareNumber> {
+public class PrepareNumber implements Comparable<PrepareNumber> {
 	private long value;
 	
 	public PrepareNumber(byte hostIdentifier, int sequenceNumber) {
@@ -42,7 +42,7 @@ public class PrepareNumber implements  Comparable<PrepareNumber> {
 		} else {
 			if (this.getValue() > prepareNumber.getValue()) {
 				return +1;
-			} else if (this.getValue() < prepareNumber.getValue()){
+			} else if (this.getValue() < prepareNumber.getValue()) {
 				return -1;
 			} else {
 				return 0;
@@ -54,4 +54,6 @@ public class PrepareNumber implements  Comparable<PrepareNumber> {
 	public String toString() {
 		return SerializationUtil.serialize(this);
 	}
+	
+	
 }

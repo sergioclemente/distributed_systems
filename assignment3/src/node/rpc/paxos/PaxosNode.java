@@ -178,7 +178,7 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 	
 	@Override
 	public void getAcceptedValue(GetAcceptedValueRequest request) {
-		this.acceptorSystem.getAcceptedValue(request.getSlotNumber(), request.getLearner());	
+		this.acceptorSystem.forwardAcceptedValue(request.getSlotNumber(), request.getLearner());	
 	}
 	
 	private boolean isProposer() {
@@ -398,24 +398,22 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 			this.paxosNode = paxosNode;
 		}
 		
-		public void getAcceptedValue(int slotNumber, int learner) {
-			LearnRequest request = this.acceptor.createLearnRequest(slotNumber, null /* TODO: fix */);
+		public void forwardAcceptedValue(int slotNumber, int learner) {
+			LearnRequest request = this.acceptor.createLearnRequest(slotNumber);
 			
-			if (learners.containsKey(learner))
-			{
+			if (learners.containsKey(learner)) {
 				learners.get(learner).learn(request);
 			}
 		}
 
 		public void learn(int slotNumber, PaxosValue value) {
 			this.paxosNode.info("learn() on slot " + slotNumber);
-			LearnRequest request = this.acceptor.createLearnRequest(slotNumber, value);
+			LearnRequest request = this.acceptor.createLearnRequest(slotNumber);
 			
 			for (ILearner learner: learners.values()) {
 				// accept return from the stub is null
 				learner.learn(request);
 			}
-			
 		}
 
 		public void connectToLearner(int addr) {
@@ -443,8 +441,7 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 			int currentSlotNumber = request.getSlotNumber();					
 			
 			for (int i = currentSlotNumber - 1; i >= 0; i--) {
-				if (this.learner.shouldStartLearningProcess(i))
-				{
+				if (this.learner.shouldStartLearningProcess(i)) {
 					startLearningProcess(i);
 				}
 			}
