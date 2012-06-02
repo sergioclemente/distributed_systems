@@ -29,14 +29,16 @@ public class PrepareState {
 	public void addPrepareResponse(PrepareResponse prepareResponse) {
 		byte hostIdentifier = prepareResponse.getHostIdentifier();
 		
-		if (this.responses.containsKey(hostIdentifier)) {
-			// Already received response from this node
-			throw new PaxosException(PaxosException.ALREADY_RECEIVED_RESPONSE_FROM_THIS_ACCEPTOR);
-		} else {
-			if (prepareResponse.getPrepareRequest().getNumber().getValue() != this.prepareRequest.getNumber().getValue()) {
-				throw new PaxosException(PaxosException.REQUEST_NUMBER_DIDNT_MATCH);
-			}
+		PrepareNumber pnResponse = prepareResponse.getPrepareRequest().getNumber();
+		PrepareNumber pnCurrent  = this.prepareRequest.getNumber();
 			
+		// If we are receiving a response for a previous prepare request (i.e. the 
+		// prepare number in the response doesn't match our current prepare number)
+		// we simply ignore it.
+			
+		if (pnResponse.getValue() != pnCurrent.getValue()) {
+			// Ignore this stale response
+		} else {
 			this.responses.put(hostIdentifier, prepareResponse);
 		}
 	}

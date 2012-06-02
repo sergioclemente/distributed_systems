@@ -2,6 +2,8 @@ package node.rpc.paxos;
 
 import java.lang.reflect.Method;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Hashtable;
@@ -19,6 +21,7 @@ import paxos.Acceptor;
 import paxos.GetAcceptedValueRequest;
 import paxos.LearnRequest;
 import paxos.Learner;
+import paxos.PaxosException;
 import paxos.PaxosValue;
 import paxos.PrepareNumber;
 import paxos.PrepareRequest;
@@ -30,6 +33,7 @@ import node.rpc.RPCNode;
 import node.storage.StorageSystemServer;
 import node.rpc.Skel_StorageServer;
 
+
 public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILearnerReply, ILearner {
 	private ProposerSystem proposerSystem;
 	private AcceptorSystem acceptorSystem;
@@ -39,6 +43,8 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 	private final int[] PROPOSER_ADDRESSES = {0,1,2}; //,3,4
 	private final int[] ACCEPTOR_ADDRESSES = {0,1,2}; //{5,6,7}; //,8,9
 	private final int[] LEARNER_ADDRESSES  = {0,1,2}; //{10}; // ,11,12,13,14
+
+	private Hashtable<Integer, PaxosValue> commands = new Hashtable<Integer, PaxosValue>();
 	
 	public PaxosNode() {
 		super(false); // do not use reliable transport
@@ -109,9 +115,43 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 			this.proposerSystem.accept(Integer.parseInt(parts[1]), new PaxosValue((byte)this.addr, parts[2]));
 		} else if (methodName.equals("execute_command")) {
 			this.proposerSystem.executeCommand(command.replaceFirst("execute_command ", ""));
+		} else if (methodName.equals("dump_values")) {
+			this.dumpValues();
 		}
 	}
 
+	public void onValueChosen(int slotNumber, PaxosValue value) {
+		if (this.commands.containsKey(slotNumber)) {
+			PaxosValue v = this.commands.get(slotNumber);
+			if (v.compareTo(value) != 0) {
+				throw new PaxosException(PaxosException.PREVIOUS_VALUE_DIFFERENT_THAN_CURRENT);
+			}
+		} else {
+			this.commands.put(slotNumber, value);
+		}
+	}
+	
+	private void dumpValues() {
+		Vector<Integer> keyList = new Vector<Integer>();
+		
+		for (Enumeration<Integer> e = this.commands.keys(); e.hasMoreElements(); ) {
+			keyList.add(e.nextElement());
+		}
+		Collections.sort(keyList);
+		
+		if (keyList.size() > 0) {
+			for (int i = 0; i <= keyList.get(keyList.size()-1); i++) {
+				String cmd = "<none>";
+				if (this.commands.containsKey(i)) {
+					PaxosValue v = this.commands.get(i);
+					cmd = String.format("%d.%s", (int) v.getProposer(), v.getCommand());
+				}
+				
+				System.out.println(String.format("node %d: slot %d: %s", this.addr, i, cmd)); 
+			}
+		}
+	}
+	
 	/**
 	 * IAcceptor_Reply.reply_prepare()
 	 */
@@ -146,7 +186,8 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 		boolean learned = this.learnerSystem.processLearnRequest(request);
 		if (learned) {
 			try	{
-				this.storageSystem.executeCommand(request.getLearnedValue().getContent().getCommand());	
+				this.storageSystem.executeCommand(request.getLearnedValue().getContent().getCommand());
+				this.onValueChosen(request.getSlotNumber(), request.getLearnedValue().getContent());
 			} catch (RPCException ex) {
 				ex.printStackTrace();
 			}
@@ -200,7 +241,6 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 		private int currentSlot;
 		private Vector<IAcceptor> acceptors = new Vector<IAcceptor>();
 		private Hashtable<Integer, String> mapSlotToCommands = new Hashtable<Integer, String>();
-		private HashSet<Integer> slotsAlreadyAccepted = new HashSet<Integer>();
 		private Vector<String> commandQueue = new Vector<String>();
 		private String currentCommand = null;
 		private Method prepareTimeoutCallback;
@@ -281,15 +321,34 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 			if (hasAcceptQuorum) {
 				// A value has been chosen. If this is the value we proposed, we can
 				// move on to the next command in the queue. Otherwise, we need to
-				// start a new Paxos round and try to get our current command accepted.
+				// start a new Paxos round and try to get our current command chosen.
 				
-				// TODO: implement
+				PaxosValue value;
+				value = new PaxosValue(this.proposer.getIdentifier(), this.mapSlotToCommands.get(slotNumber));
+				
+				boolean choseOurCommand;
+				choseOurCommand = this.proposer.isValueChosen(slotNumber, value);
+				
+				if (slotNumber == this.currentSlot)
+					this.currentSlot++;
 
-				this.currentCommand = null;
-				
+				if (choseOurCommand) {
+					// The value we proposed was chosen for this slot.
+					// Move on to the next command in the queue, if any.
+					negotiateNextCommand(slotNumber+1);
+					
+				} else {
+					// The value we proposed was NOT chosen. Try the next slot (if we haven't started it yet).
+					if (!this.mapSlotToCommands.containsKey(slotNumber+1)) {
+						this.mapSlotToCommands.put(slotNumber+1, this.currentCommand);
+						this.prepare(slotNumber+1);
+					}
+				}
+
 			} else {
 				// Here, either (1) we don't have enough accept responses (yet) or
-				// (2) the proposal was not accepted.
+				// (2) the proposal was not accepted (enough responses but not enough
+				// accepts).
 				
 				if (this.proposer.hasEnoughAcceptResponses(slotNumber)) {
 					// Proposal not accepted, we should retry after a random timeout
@@ -303,31 +362,23 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 				
 		}
 
-		private void reExecuteCommand(PrepareRequest request) {
-			int slotNumber = request.getSlotNumber();
-			
-			// TODO-luciano: review and fix
-			if (this.mapSlotToCommands.containsKey(slotNumber)) {
-				String command = this.mapSlotToCommands.get(slotNumber);
-				this.mapSlotToCommands.remove(slotNumber);
-				this.executeCommand(command);				
-			}
-		}
-
 		public void executeCommand(String command) {
-			this.mapSlotToCommands.put(this.currentSlot, command);
-			
 			// Queue the current command.
 			// Commands are processed one at a time in FIFO order, so that serialization
 			// is preserved among commands sent to the same proposer.
 			this.commandQueue.add(command);
 			
-			if (this.currentCommand == null) {
+			negotiateNextCommand(this.currentSlot);
+		}
+		
+		private void negotiateNextCommand(int slotNumber) {
+			if (!this.commandQueue.isEmpty() && !this.mapSlotToCommands.containsKey(slotNumber)) { 
 				// Get the next command from the queue
 				this.currentCommand = this.commandQueue.remove(0);
-				
+				this.mapSlotToCommands.put(slotNumber, currentCommand);
+
 				// Start a new Paxos round for this command
-				this.prepare(this.currentSlot++);
+				this.prepare(slotNumber);
 			}
 		}
 

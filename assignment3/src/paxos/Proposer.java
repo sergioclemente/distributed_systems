@@ -105,22 +105,6 @@ public class Proposer {
 		return this.isMajority(count);
 	}
 	
-	/*
-	public boolean shouldResendPrepareRequest(int slotNumber) {
-		int majority = this.numberOfAcceptors/2 + 1;
-		PrepareState state = this.responses.get(slotNumber);
-		 
-		int promiseCount = this.getPromiseCount(state);
-		int totalCount = state.getProposalResponses().size();
-		int remaining = this.numberOfAcceptors - totalCount;
-		
-		// Should we should the prepare when the number of acceptors + remaining
-		// can never be a majority
-		// TODO: it also have to consider timeouts
-		return haveAnyNodeAccepted(state) || promiseCount + remaining < majority;
-	}
-	*/
-	
 	/**
 	 * shouldResendPrepareRequest2() checks if the proposer is stuck in a prepare
 	 * request due to the lack of responses. 
@@ -246,8 +230,32 @@ public class Proposer {
 		return isMajority(acceptCount);
 	}
 	
-	public int getNumberOfAcceptors()
-	{
+	public int getNumberOfAcceptors() {
 		return this.numberOfAcceptors;
+	}
+	
+	
+	/**
+	 * isValueChosen() is called by the ProposerSystem to verify if the chosen
+	 * value matches the given one. This method is only called after the 
+	 * ProposerSystem is sure that a value has been chosen, so we can skip some
+	 * unnecessary validation. 
+	 * For our purposes here, we don't care *which* value was chosen, we only 
+	 * care about whether or not it matches the given value.
+	 */
+	public boolean isValueChosen(int slotNumber, PaxosValue value) {
+		int matchCount = 0;
+		AcceptState acceptState = this.acceptances.get(slotNumber);
+	
+		for (AcceptResponse acceptResponse : acceptState.getAcceptResponses()) {
+			if (acceptResponse.getAccepted()) {
+				PaxosValue acceptedValue = acceptResponse.getValue();
+				if (value.compareTo(acceptedValue) == 0) {
+					matchCount++;
+				}
+			}
+		}
+		
+		return this.isMajority(matchCount); 
 	}
 }

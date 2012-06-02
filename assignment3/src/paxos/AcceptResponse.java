@@ -7,12 +7,14 @@ public class AcceptResponse {
 	private PrepareRequest prepareRequest;
 	private PrepareNumber acceptedProposalNumber;
 	private boolean accepted;
+	private PaxosValue value;
 	
-	public AcceptResponse(byte hostIdentifier, PrepareRequest prepareRequest, PrepareNumber acceptedProposalNumber, boolean accepted) {
+	public AcceptResponse(byte hostIdentifier, PrepareRequest prepareRequest, PrepareNumber acceptedProposalNumber, boolean accepted, PaxosValue value) {
 		this.hostIdentifier = hostIdentifier;
 		this.prepareRequest = prepareRequest;
 		this.acceptedProposalNumber = acceptedProposalNumber;
 		this.accepted = accepted;
+		this.value = value;
 	}
 	
 	public byte getHostIdentifier() {
@@ -29,6 +31,10 @@ public class AcceptResponse {
 	
 	public boolean getAccepted() {
 		return this.accepted;
+	}
+	
+	public PaxosValue getValue() {
+		return this.value;
 	}
 	
 	@Override

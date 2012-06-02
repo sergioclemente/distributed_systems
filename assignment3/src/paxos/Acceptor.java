@@ -1,36 +1,36 @@
 package paxos;
 
-import java.util.Hashtable;
+import java.util.LinkedHashMap;
 import util.ISerialization;
 
 public class Acceptor {
 	private byte hostIdentifier;
 	private ISerialization serialization;
-	private Hashtable<Integer, PrepareNumber> promisedNumbers;
-	private Hashtable<Integer, PrepareNumber> acceptedNumbers;
-	private Hashtable<Integer, PaxosValue> acceptedValues;
+	private LinkedHashMap<Integer, PrepareNumber> promisedNumbers;
+	private LinkedHashMap<Integer, PrepareNumber> acceptedNumbers;
+	private LinkedHashMap<Integer, PaxosValue> acceptedValues;
 
 	public Acceptor(byte hostIdentifier, ISerialization serialization) {
 		this.hostIdentifier = hostIdentifier;
 		this.serialization = serialization;
 
 		if (this.serialization != null) {
-			this.promisedNumbers = (Hashtable<Integer, PrepareNumber>) this.serialization.restoreState("promisedNumbers");
+			this.promisedNumbers = (LinkedHashMap<Integer, PrepareNumber>) this.serialization.restoreState("promisedNumbers");
 			if (this.promisedNumbers == null)
-				this.promisedNumbers = new Hashtable<Integer, PrepareNumber>();
+				this.promisedNumbers = new LinkedHashMap<Integer, PrepareNumber>();
 			
-			this.acceptedNumbers = (Hashtable<Integer, PrepareNumber>) this.serialization.restoreState("acceptedNumbers");
+			this.acceptedNumbers = (LinkedHashMap<Integer, PrepareNumber>) this.serialization.restoreState("acceptedNumbers");
 			if (this.acceptedNumbers == null)
-				this.acceptedNumbers = new Hashtable<Integer, PrepareNumber>();
+				this.acceptedNumbers = new LinkedHashMap<Integer, PrepareNumber>();
 			
-			this.acceptedValues = (Hashtable<Integer, PaxosValue>) this.serialization.restoreState("acceptedValues");
+			this.acceptedValues = (LinkedHashMap<Integer, PaxosValue>) this.serialization.restoreState("acceptedValues");
 			if (this.acceptedValues == null)
-				this.acceptedValues = new Hashtable<Integer, PaxosValue>();
+				this.acceptedValues = new LinkedHashMap<Integer, PaxosValue>();
 			
 		} else {
-			this.promisedNumbers = new Hashtable<Integer, PrepareNumber>();
-			this.acceptedNumbers = new Hashtable<Integer, PrepareNumber>();
-			this.acceptedValues = new Hashtable<Integer, PaxosValue>();
+			this.promisedNumbers = new LinkedHashMap<Integer, PrepareNumber>();
+			this.acceptedNumbers = new LinkedHashMap<Integer, PrepareNumber>();
+			this.acceptedValues = new LinkedHashMap<Integer, PaxosValue>();
 		}
 	}
 
@@ -102,7 +102,7 @@ public class Acceptor {
 		}
 
 		return new AcceptResponse(this.hostIdentifier, prepareRequest,
-				requestNumber.clone(), accepted);
+				requestNumber.clone(), accepted, acceptRequest.getValue());
 	}
 
 	/**
