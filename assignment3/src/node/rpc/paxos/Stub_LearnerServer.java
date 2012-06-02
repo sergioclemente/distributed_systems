@@ -1,5 +1,6 @@
 package node.rpc.paxos;
 
+import node.rpc.RPCException;
 import node.rpc.RPCNode;
 import node.rpc.RPCStub;
 import paxos.LearnRequest;
@@ -14,13 +15,17 @@ public class Stub_LearnerServer extends RPCStub implements ILearner {
 	}
 
 	@Override
-	protected void dispatchReply(int replyId, String methodName, int sender,
-			int result, String content) {
-		if (methodName.compareToIgnoreCase("learn") == 0)
-		{
-			learnerReply.reply_learn(replyId, sender, result);
+	protected void dispatchReply(int replyId, String methodName, int sender, int result, String content) {
+		if (result == 0) {
+			if (methodName.compareToIgnoreCase("learn") == 0) {
+				learnerReply.reply_learn(replyId, sender, result);
+			} else {
+				m_node.error("Unexpected method reply: " + methodName);
+			}
 		} else {
-			m_node.error("Unexpected method reply: " + methodName);
+			m_node.error(String.format("%d: %d.%s() failed with error [%d,%d]", 
+					m_node.addr, sender, methodName, 
+					RPCException.getErrorClass(result), RPCException.getErrorCode(result)));
 		}
 	}
 

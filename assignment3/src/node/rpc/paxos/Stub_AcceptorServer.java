@@ -1,5 +1,6 @@
 package node.rpc.paxos;
 
+import node.rpc.RPCException;
 import node.rpc.RPCNode;
 import node.rpc.RPCStub;
 import paxos.*;
@@ -35,18 +36,21 @@ public class Stub_AcceptorServer extends RPCStub implements IAcceptor {
 	}
 
 	@Override
-	protected void dispatchReply(int replyId, String methodName, int sender,
-			int result, String content) {
-		if (methodName.compareToIgnoreCase("accept") == 0)
-		{
-			AcceptResponse response = (AcceptResponse)SerializationUtil.deserialize(content, AcceptResponse.class);
-			
-			acceptorReply.reply_accept(replyId, sender, result, response);
-		} else if (methodName.compareToIgnoreCase("prepare") == 0) {
-			PrepareResponse response = (PrepareResponse)SerializationUtil.deserialize(content, PrepareResponse.class);
-			acceptorReply.reply_prepare(replyId, sender, result, response);
+	protected void dispatchReply(int replyId, String methodName, int sender, int result, String content) {
+		if (result == 0) {
+			if (methodName.compareToIgnoreCase("accept") == 0) {
+				AcceptResponse response = (AcceptResponse)SerializationUtil.deserialize(content, AcceptResponse.class);
+				acceptorReply.reply_accept(replyId, sender, result, response);
+			} else if (methodName.compareToIgnoreCase("prepare") == 0) {
+				PrepareResponse response = (PrepareResponse)SerializationUtil.deserialize(content, PrepareResponse.class);
+				acceptorReply.reply_prepare(replyId, sender, result, response);
+			} else {
+				m_node.error("Unexpected method reply: " + methodName);
+			}
 		} else {
-			m_node.error("Unexpected method reply: " + methodName);
+			m_node.error(String.format("%d: %d.%s() failed with error [%d,%d]", 
+					m_node.addr, sender, methodName, 
+					RPCException.getErrorClass(result), RPCException.getErrorCode(result)));
 		}
-	}	
+	}
 }

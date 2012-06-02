@@ -343,6 +343,12 @@ public class ReliableDeliveryNode extends Node {
 						assert queuedPacket.getType() == MESSAGE_TYPE.DATA;
 						onPacketTimeout(queuedPacket);
 					}
+					
+					if (packet.getType() == MESSAGE_TYPE.CONNECT)
+					{
+						m_activeOutSessions.remove(packet.getTo());
+						m_allOutSessions.remove(session.getConnectionId());
+					}
 				} 
 				else 
 				{
@@ -370,6 +376,7 @@ public class ReliableDeliveryNode extends Node {
 				assert packet.getSequence() == 0;
 				assert packet.getType() == MESSAGE_TYPE.CONNECT;
 				info("Cancelling connection attempt, connectionId=" + packet.getConnectionId());
+				
 			}
 
 			// Cancel any queued packets
