@@ -1,14 +1,7 @@
 package util;
-
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Hashtable;
-import java.util.Vector;
-
 import node.rpc.RPCNode;
-
-import edu.washington.cs.cse490h.lib.Node;
-import edu.washington.cs.cse490h.lib.PersistentStorageReader;
 import edu.washington.cs.cse490h.lib.PersistentStorageWriter;
 
 public class NodeSerialization implements ISerialization {
@@ -85,7 +78,7 @@ public class NodeSerialization implements ISerialization {
 				f.delete();
 			}
 		} catch (IOException e) {
-			
+			e.printStackTrace();
 		}
 	}
 	

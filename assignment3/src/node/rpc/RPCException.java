@@ -1,6 +1,7 @@
 package node.rpc;
 
 public class RPCException extends Exception {
+	private static final long serialVersionUID = 1202424055142544477L;
 	public static final int ERROR_CLASS_CLIENT = 0;
 	public static final int ERROR_CLASS_PROTOCOL = 1;
 	

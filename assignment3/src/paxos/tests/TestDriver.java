@@ -25,7 +25,7 @@ public class TestDriver {
 		}
 		
 		for (int i = 0; i< numberOfLearners; i++) {
-			this.learners.add(new Learner(hostIdentifier++, this.acceptors.size()));
+			//this.learners.add(new Learner(hostIdentifier++, this.acceptors.size()));
 		}
 	}
 	
@@ -64,8 +64,6 @@ public class TestDriver {
 		Proposer proposer = this.proposers.get(proposeServer);
 		
 		AcceptRequest request = proposer.createAcceptRequest(slotNumber, new PaxosValue((byte) proposeServer, value));
-		
-		long prepareNumberValue = request.getPrepareRequest().getNumber().getValue();
 		
 		boolean accepted = true;
 		for (int idx : acceptServers) {

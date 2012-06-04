@@ -1,16 +1,14 @@
 package paxos;
-
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.Hashtable;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.Vector;
 
 public class Learner {
 	private LearnedValues learnedValues;
-	
-	/**
-	 * Count of how many accepts a learner got for each proposal number.
-	 */
-	private Map<Integer, Integer> numAcceptNotifications;
 	
 	/**
 	 * The number of acceptors in the system. It is used by the learner so that it can decide when it has
@@ -22,11 +20,17 @@ public class Learner {
 	private byte hostIdentifier;
 	private Hashtable<Integer, Hashtable<Byte, LearnedValue>> acceptances;
 	
-	public Learner(byte hostIdentifier, int numberOfAcceptors) {
+	public Learner(byte hostIdentifier, int numberOfAcceptors, LinkedHashMap<Integer, PaxosValue> knownValues, int slotCount) {
 		this.learnedValues = new LearnedValues();
 		this.hostIdentifier = hostIdentifier;
 		this.acceptances = new Hashtable<Integer, Hashtable<Byte, LearnedValue>>();
 		this.numberOfAcceptors = numberOfAcceptors;
+		
+		// Populate current known values
+		for (int i = 0; i < slotCount; i++) {
+			LearnedValue lv = new LearnedValue(i, knownValues.get(i), new PrepareNumber(hostIdentifier, 1)); 
+			this.learnedValues.setAt(i, lv);
+		}
 	}
 	
 	public boolean processLearnRequest(LearnRequest learnRequest) {
@@ -48,6 +52,10 @@ public class Learner {
 		// Store / update the sender's accepted value
 		slotAcceptances.put(learnRequest.getHostIdentifier(), learnRequest.getLearnedValue());
 
+		// Build a histogram of each accepted value.
+		// Technically we should be counting proposals, but since each 
+		// proposed value is unique (since it carries the value plus
+		// proposer ID), counting values works just as well.
 		Hashtable<PaxosValue, Integer> valueCounter = new Hashtable<PaxosValue, Integer>();
 		for (LearnedValue acceptedValue : slotAcceptances.values()) {
 			PaxosValue v = acceptedValue.getContent();
@@ -58,6 +66,7 @@ public class Learner {
 			}
 		}
 		
+		// A value is chosen when its accepted count is a majority.
 		PaxosValue chosenValue = null;
 		for (PaxosValue v : valueCounter.keySet()) {
 			int count = valueCounter.get(v);
@@ -68,11 +77,8 @@ public class Learner {
 		}
 		
 		if (chosenValue != null) {
-			// TODO: store a valid LearnValue object?
-			LearnedValue hack = new LearnedValue(slotNumber, chosenValue, learnRequest.getLearnedValue().getNumber());
-			
-			learnedValues.setAt(slotNumber, hack);
-			
+			LearnedValue lv = new LearnedValue(slotNumber, chosenValue, learnRequest.getLearnedValue().getNumber());
+			learnedValues.setAt(slotNumber, lv);
 			System.out.println(String.format("##### L%d: Value was chosen: (%d,%s)", 
 					(int) this.hostIdentifier, (int) chosenValue.getProposer(), 
 					chosenValue.getCommand()));
@@ -82,8 +88,6 @@ public class Learner {
 					(int) this.hostIdentifier));
 			return false;
 		}
-
-		//TODO-licavalc: maybe we should save to stable storage here.		
 	}
 
 	public LearnedValue getLearnedValue(int slotNumber) {
@@ -92,7 +96,6 @@ public class Learner {
 	
 	public boolean shouldStartLearningProcess(int slotNumber) {
 		//TODO-licavalc: need to deal with the case where we are in the middle or learning but didn't get all answers
-		
 		// Don't know the value and haven't started learning
 		if (this.learnedValues.getAt(slotNumber) == null && !this.acceptances.containsKey(slotNumber)) {
 			this.acceptances.put(slotNumber, new Hashtable<Byte, LearnedValue>());

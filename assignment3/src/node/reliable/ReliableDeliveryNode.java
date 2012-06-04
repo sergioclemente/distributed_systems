@@ -140,6 +140,13 @@ public class ReliableDeliveryNode extends Node {
 			System.out.println(String.format("*** %d: INF: %s", this.addr, msg));
 		}
 	}
+
+	
+	public void paxosinfo(String msg) 
+	{
+		// Put some markers in the beginning so we can easily distinguish between system messages
+		System.out.println(String.format("*** %d: PAXOS: %s", this.addr, msg));
+	}
 	
 	/**
 	 * Methods that subclasses will call to unreliably send a message
@@ -641,6 +648,7 @@ public class ReliableDeliveryNode extends Node {
 		return session;
 	}
 
+	/*
 	private Session getInboundById(Integer connectionId)
 	{
 		Session session = null;
@@ -652,6 +660,7 @@ public class ReliableDeliveryNode extends Node {
 		
 		return session;
 	}
+	*/
 	
 	private Session getOutboundById(Integer connectionId)
 	{

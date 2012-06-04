@@ -2,7 +2,6 @@ package node.rpc;
 import java.util.Hashtable;
 import java.util.LinkedList;
 import java.util.Queue;
-import java.util.UUID;
 import java.util.Vector;
 import node.reliable.ReliableDeliveryNode;
 import edu.washington.cs.cse490h.lib.Utility;

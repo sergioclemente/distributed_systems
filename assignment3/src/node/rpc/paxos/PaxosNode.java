@@ -3,18 +3,15 @@ package node.rpc.paxos;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Enumeration;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Hashtable;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.Vector;
-
-import org.apache.commons.lang.math.RandomUtils;
-
 import edu.washington.cs.cse490h.lib.Callback;
 import edu.washington.cs.cse490h.lib.Utility;
-
 import paxos.AcceptRequest;
 import paxos.AcceptResponse;
 import paxos.Acceptor;
@@ -27,11 +24,12 @@ import paxos.PrepareNumber;
 import paxos.PrepareRequest;
 import paxos.PrepareResponse;
 import paxos.Proposer;
-import util.NodeSerialization;
 import node.rpc.RPCException;
 import node.rpc.RPCNode;
-import node.storage.StorageSystemServer;
 import node.rpc.Skel_StorageServer;
+import node.storage.StorageSystemServer;
+import util.ISerialization;
+import util.NodeSerialization;
 
 
 public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILearnerReply, ILearner {
@@ -40,22 +38,25 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 	private LearnerSystem learnerSystem;
 	private StorageSystemServer storageSystem;
 	
-	private final int[] PROPOSER_ADDRESSES = {0,1,2}; //,3,4
-	private final int[] ACCEPTOR_ADDRESSES = {0,1,2}; //{5,6,7}; //,8,9
-	private final int[] LEARNER_ADDRESSES  = {0,1,2}; //{10}; // ,11,12,13,14
+	private final int[] PROPOSER_ADDRESSES = {0,1,2};
+	private final int[] ACCEPTOR_ADDRESSES = {0,1,2};
+	private final int[] LEARNER_ADDRESSES  = {0,1,2};
 
-	private Hashtable<Integer, PaxosValue> commands = new Hashtable<Integer, PaxosValue>();
+	private LinkedHashMap<Integer, PaxosValue> commands = new LinkedHashMap<Integer, PaxosValue>();
+	private int lastExecutedCommand = -1;
+	private ISerialization serialization = new NodeSerialization(this, "node.txt");
 	
 	public PaxosNode() {
-		super(false); // do not use reliable transport
+		super(false); 
 	}
 	
 	@Override
 	public void start() {
 		super.start();
+		this.restoreNodeState();
 		
 		if (this.isAcceptor()) {
-			this.info("Starting acceptor node on address " + this.addr);
+			this.paxosinfo("Starting acceptor node on address " + this.addr);
 			this.acceptorSystem = new AcceptorSystem((byte)this.addr, this);
 			
 			// Connect to the learners
@@ -68,8 +69,8 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 		}
 		
 		if (this.isProposer()) {
-			this.info("Starting proposer node on address " + this.addr);
-			this.proposerSystem = new ProposerSystem((byte)this.addr, this);
+			this.paxosinfo("Starting proposer node on address " + this.addr);
+			this.proposerSystem = new ProposerSystem((byte)this.addr, this, this.lastExecutedCommand);
 			
 			// Connect to the acceptors
 			for (int acceptorAddr : ACCEPTOR_ADDRESSES) {
@@ -78,8 +79,9 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 		}
 		
 		if (this.isLearner()) {
-			this.info("Starting learner node on address " + this.addr);
-			this.learnerSystem = new LearnerSystem((byte)this.addr, this, ACCEPTOR_ADDRESSES.length);
+			this.paxosinfo("Starting learner node on address " + this.addr);
+			this.learnerSystem = new LearnerSystem((byte)this.addr, this, ACCEPTOR_ADDRESSES.length,
+					this.commands, this.lastExecutedCommand+1);
 			
 			Skel_LearnerServer skel_Learner = new Skel_LearnerServer(this);
 			skel_Learner.bindMethods(this);
@@ -98,7 +100,7 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 			skel_Storage.bindMethods(this);
 		}
 		
-		this.info("Starting storage system on address " + this.addr);
+		this.paxosinfo("Starting storage system on address " + this.addr);
 		storageSystem = new StorageSystemServer(this);
 		Skel_StorageServer storageSkel = new Skel_StorageServer(storageSystem);
 		storageSkel.bindMethods(this);
@@ -114,13 +116,19 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 		} else if (methodName.equals("accept")) {
 			this.proposerSystem.accept(Integer.parseInt(parts[1]), new PaxosValue((byte)this.addr, parts[2]));
 		} else if (methodName.equals("execute_command")) {
-			this.proposerSystem.executeCommand(command.replaceFirst("execute_command ", ""));
+			this.proposerSystem.proposeCommand(command.replaceFirst("execute_command ", ""));
 		} else if (methodName.equals("dump_values")) {
 			this.dumpValues();
 		}
 	}
 
+	/**
+	 * onValueChosen() is called by the learner when a value is chosen for the
+	 * given slot.
+	 */
 	public void onValueChosen(int slotNumber, PaxosValue value) {
+		boolean saveCommandList = true;
+				
 		if (this.commands.containsKey(slotNumber)) {
 			PaxosValue v = this.commands.get(slotNumber);
 			if (v.compareTo(value) != 0) {
@@ -129,13 +137,43 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 		} else {
 			this.commands.put(slotNumber, value);
 		}
+
+		// Attempt to execute all new commands up to this slot's command or
+		// until a hole is found. 
+		if (this.lastExecutedCommand < slotNumber) {
+			for (int i = this.lastExecutedCommand+1; i <= slotNumber; i++) {
+				if (!this.commands.containsKey(i)) {
+					// Found a hole. Skip until next chosen value.
+					break;
+				}
+				
+				// Save state first -- assignment asks for at most once semantics
+				this.lastExecutedCommand = i;
+				if (saveCommandList) {
+					this.serialization.saveState("commands", this.commands);
+					saveCommandList = false;
+				}
+				this.serialization.saveState("lastExecutedCommand", this.lastExecutedCommand);
+
+				try {
+					// Execute the command
+					PaxosValue v = commands.get(i);
+					this.paxosinfo(String.format("S%d: executing chosen command: %d.%s", 
+							this.addr, v.getProposer(), v.getCommand()));
+					this.storageSystem.executeCommand(v.getCommand());
+				} catch (RPCException e) {
+					e.printStackTrace();
+				}
+			}
+		}
 	}
 	
 	private void dumpValues() {
 		Vector<Integer> keyList = new Vector<Integer>();
 		
-		for (Enumeration<Integer> e = this.commands.keys(); e.hasMoreElements(); ) {
-			keyList.add(e.nextElement());
+		Set<Integer> keyset = this.commands.keySet();
+		for (Iterator<Integer> e = keyset.iterator(); e.hasNext(); ) {
+			keyList.add(e.next());
 		}
 		Collections.sort(keyList);
 		
@@ -147,7 +185,7 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 					cmd = String.format("%d.%s", (int) v.getProposer(), v.getCommand());
 				}
 				
-				System.out.println(String.format("node %d: slot %d: %s", this.addr, i, cmd)); 
+				this.paxosinfo(String.format("node %d: slot %d: %s", this.addr, i, cmd)); 
 			}
 		}
 	}
@@ -157,7 +195,6 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 	 */
 	@Override
 	public void reply_prepare(int replyId, int sender, int result, PrepareResponse response) {
-		this.info("Received prepare() response from acceptor");
 		this.proposerSystem.processPrepareResponse(response);
 	}
 
@@ -166,7 +203,6 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 	 */
 	@Override
 	public void reply_accept(int replyId, int sender, int result, AcceptResponse response) {
-		this.info("Received accept() response from acceptor");
 		this.proposerSystem.processAcceptResponse(response);
 	}
 
@@ -185,12 +221,7 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 	public void learn(LearnRequest request) {		
 		boolean learned = this.learnerSystem.processLearnRequest(request);
 		if (learned) {
-			try	{
-				this.storageSystem.executeCommand(request.getLearnedValue().getContent().getCommand());
-				this.onValueChosen(request.getSlotNumber(), request.getLearnedValue().getContent());
-			} catch (RPCException ex) {
-				ex.printStackTrace();
-			}
+			this.onValueChosen(request.getSlotNumber(), request.getLearnedValue().getContent());
 		}
 	}
 	
@@ -233,8 +264,29 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 	private boolean isLearner() {
 		return Arrays.binarySearch(LEARNER_ADDRESSES, this.addr) >= 0;
 	}
+
+	private void restoreNodeState() {
+		Double lastExecutedCommand;
+		lastExecutedCommand = (Double) this.serialization.restoreState("lastExecutedCommand");
+		if (lastExecutedCommand != null) {
+			this.lastExecutedCommand = lastExecutedCommand.intValue();
+		}
+		
+		LinkedHashMap<String, LinkedHashMap<String, Object>> commands;
+		commands = (LinkedHashMap<String, LinkedHashMap<String, Object>>) this.serialization.restoreState("commands");
+		if (commands != null) {
+			for (Map.Entry<String, LinkedHashMap<String, Object>> entry : commands.entrySet()) {
+				LinkedHashMap<String, Object> fields = entry.getValue();
+				Integer slotNumber = Integer.valueOf(entry.getKey()); 
+				byte proposer = ((Double) fields.get("proposer")).byteValue();
+				String command = (String) fields.get("command");
+				PaxosValue v = new PaxosValue(proposer, command);
+				this.commands.put(slotNumber, v);
+			}
+		}
+	}
 	
-	
+
 	public class ProposerSystem {
 		private PaxosNode paxosNode;
 		private Proposer proposer;
@@ -246,10 +298,13 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 		private Method prepareTimeoutCallback;
 		private Method prepareResubmitCallback;
 		private Hashtable<Integer, PrepareNumber> acceptsSent = new Hashtable<Integer, PrepareNumber>();
+		//private ISerialization serialization;
 		
-		public ProposerSystem(byte hostIdentifier, PaxosNode paxosNode) {
+		public ProposerSystem(byte hostIdentifier, PaxosNode paxosNode, int lastSlot) {
 			this.proposer = new Proposer(hostIdentifier, ACCEPTOR_ADDRESSES.length);
 			this.paxosNode = paxosNode;
+			//this.serialization = new NodeSerialization(paxosNode, "proposer.txt");
+			this.currentSlot = lastSlot+1;
 			
 			try {
 				this.prepareTimeoutCallback = Callback.getMethod("onPrepareTimeout", this, new String[] { "java.lang.Integer", "java.lang.Integer" });
@@ -257,6 +312,15 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
+			
+			/*
+			if (this.serialization != null) {
+				Integer currentSlot = (Integer) this.serialization.restoreState("currentSlot");
+				if (currentSlot != null) {
+					this.currentSlot = currentSlot;
+				}
+			}
+			*/
 		}
 		
 		public void processPrepareResponse(PrepareResponse response) {
@@ -335,7 +399,7 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 				if (choseOurCommand) {
 					// The value we proposed was chosen for this slot.
 					// Move on to the next command in the queue, if any.
-					negotiateNextCommand(slotNumber+1);
+					proposeNextCommand(slotNumber+1);
 					
 				} else {
 					// The value we proposed was NOT chosen. Try the next slot (if we haven't started it yet).
@@ -362,16 +426,16 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 				
 		}
 
-		public void executeCommand(String command) {
+		public void proposeCommand(String command) {
 			// Queue the current command.
 			// Commands are processed one at a time in FIFO order, so that serialization
 			// is preserved among commands sent to the same proposer.
 			this.commandQueue.add(command);
 			
-			negotiateNextCommand(this.currentSlot);
+			proposeNextCommand(this.currentSlot);
 		}
 		
-		private void negotiateNextCommand(int slotNumber) {
+		private void proposeNextCommand(int slotNumber) {
 			if (!this.commandQueue.isEmpty() && !this.mapSlotToCommands.containsKey(slotNumber)) { 
 				// Get the next command from the queue
 				this.currentCommand = this.commandQueue.remove(0);
@@ -383,7 +447,7 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 		}
 
 		public void prepare(int slotNumber) {
-			this.paxosNode.info("prepare() on slot " + slotNumber);
+			this.paxosNode.paxosinfo("prepare() on slot " + slotNumber);
 			PrepareRequest request = this.proposer.createPrepareRequest(slotNumber);
 			
 			for (IAcceptor acceptor: acceptors) {
@@ -400,7 +464,7 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 		}
 		
 		public void accept(int slotNumber, PaxosValue value) {
-			this.paxosNode.info("accept() on slot " + slotNumber);
+			this.paxosNode.paxosinfo("accept() on slot " + slotNumber);
 			AcceptRequest request = this.proposer.createAcceptRequest(slotNumber, value);
 			
 			for (IAcceptor acceptor: acceptors) {
@@ -410,7 +474,7 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 		}
 
 		public void connectToAcceptor(int addr) {
-			this.paxosNode.info("connecting to acceptor address " + addr);
+			this.paxosNode.paxosinfo("connecting to acceptor address " + addr);
 			Stub_AcceptorServer stub = new Stub_AcceptorServer(this.paxosNode, addr, this.paxosNode);
 			this.acceptors.add(stub);
 		}
@@ -425,7 +489,7 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 		 * received enough replies to either re-submit or move to the accept phase).
 		 */
 		public void onPrepareTimeout(Integer slotNumber, Integer sequenceNumber) {
-			if (this.proposer.shouldResendPrepareRequest2(slotNumber, sequenceNumber)) {
+			if (this.proposer.shouldResendPrepareRequest(slotNumber, sequenceNumber)) {
 				this.prepare(slotNumber);
 			}
 		}
@@ -445,7 +509,7 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 		private Map<Integer, ILearner> learners = new HashMap<Integer, ILearner>();
 		
 		public AcceptorSystem(byte hostIdentifier, PaxosNode paxosNode) {
-			this.acceptor = new Acceptor(hostIdentifier, new NodeSerialization(paxosNode, "serialization.txt"));
+			this.acceptor = new Acceptor(hostIdentifier, new NodeSerialization(paxosNode, "acceptor_state.txt"));
 			this.paxosNode = paxosNode;
 		}
 		
@@ -458,7 +522,7 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 		}
 
 		public void learn(int slotNumber, PaxosValue value) {
-			this.paxosNode.info("learn() on slot " + slotNumber);
+			this.paxosNode.paxosinfo("learn() on slot " + slotNumber);
 			LearnRequest request = this.acceptor.createLearnRequest(slotNumber);
 			
 			for (ILearner learner: learners.values()) {
@@ -468,7 +532,7 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 		}
 
 		public void connectToLearner(int addr) {
-			this.paxosNode.info("connecting to learner address " + addr);
+			this.paxosNode.paxosinfo("connecting to learner address " + addr);
 			Stub_LearnerServer stub = new Stub_LearnerServer(this.paxosNode, addr, this.paxosNode);
 			this.learners.put(addr, stub);
 		}
@@ -483,8 +547,9 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 		private PaxosNode paxosNode;
 		private Vector<IAcceptor> acceptors = new Vector<IAcceptor>();
 		
-		public LearnerSystem(byte hostIdentifier, PaxosNode paxosNode, int numberOfAcceptors) {
-			this.learner = new Learner(hostIdentifier, numberOfAcceptors);
+		public LearnerSystem(byte hostIdentifier, PaxosNode paxosNode, int numberOfAcceptors,
+				LinkedHashMap<Integer, PaxosValue> knownValues, int slotCount) {
+			this.learner = new Learner(hostIdentifier, numberOfAcceptors, knownValues, slotCount);
 			this.paxosNode = paxosNode;
 		}
 
@@ -501,7 +566,7 @@ public class PaxosNode extends RPCNode implements IAcceptorReply, IAcceptor, ILe
 		}
 		
 		public void connectToAcceptor(int addr) {
-			this.paxosNode.info("connecting to acceptor address " + addr);
+			this.paxosNode.paxosinfo("connecting to acceptor address " + addr);
 			Stub_AcceptorServer stub = new Stub_AcceptorServer(this.paxosNode, addr, this.paxosNode);
 			this.acceptors.add(stub);
 		}

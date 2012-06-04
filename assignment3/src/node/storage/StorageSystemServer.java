@@ -3,8 +3,6 @@ package node.storage;
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.ListIterator;
-import java.util.Vector;
 import node.rpc.IStorageServer;
 import node.rpc.RPCException;
 import node.rpc.RPCNode;
@@ -17,9 +15,6 @@ public class StorageSystemServer implements IStorageServer
 {
 	private static final String TEMP_FILE = ".temp";
 
-	private static final String ERROR_MESSAGE_FORMAT = 
-			"Error: %s on server %d and file %s returned error code %s";
-	
 	private static final int FILE_DOES_NOT_EXIST = 10;	
 	private static final int FILE_ALREADY_EXISTS = 11;
 	private static final int FILE_TOO_LARGE = 30;		
@@ -192,7 +187,8 @@ public class StorageSystemServer implements IStorageServer
     		}
 
     		String contents = command.substring(methodName.length()+1);
-
+			contents += "\n";
+			
     		if (methodName.equals("put"))
     		{
     			putFile(fileName, contents);

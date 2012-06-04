@@ -1,24 +1,16 @@
 package paxos;
 
 import java.util.Hashtable;
-import java.util.Vector;
-
-import com.google.gson.internal.Pair;
 
 public class Proposer {
-	//private PrepareNumber currentPrepareNumber;
 	private int numberOfAcceptors;
 	private byte hostIdentifier;
-	
-	// Map from: Slot Number (Index) --> Host Identifier --> PrepareResponse
-	// That is used when the value is not chosen yet
 	private Hashtable<Integer, PrepareState> responses;
 	private Hashtable<Integer, PrepareNumber> prepareNumbers;
 	private Hashtable<Integer, AcceptState> acceptances;
 	
 	public Proposer(byte hostIdentifier, int numberOfAcceptors) {
 		this.responses = new Hashtable<Integer, PrepareState>();
-		//this.currentPrepareNumber = new PrepareNumber(hostIdentifier, 0);
 		this.hostIdentifier = hostIdentifier;
 		this.numberOfAcceptors = numberOfAcceptors;
 		this.prepareNumbers = new Hashtable<Integer, PrepareNumber>();
@@ -115,7 +107,7 @@ public class Proposer {
 	 * less than a majority, then the proposer hasn't received enough replies to
 	 * know that it resubmit the request, therefore it is stuck. 
 	 */
-	public boolean shouldResendPrepareRequest2(int slotNumber, int sequenceNumber) {
+	public boolean shouldResendPrepareRequest(int slotNumber, int sequenceNumber) {
 		PrepareState state = this.responses.get(slotNumber);
 		PrepareNumber pn = this.prepareNumbers.get(slotNumber);
 		
@@ -128,27 +120,6 @@ public class Proposer {
 			return false;
 		}
 	}
-	
-	/*
-	private boolean haveAnyNodeAccepted(PrepareState proposalState) {
-		return getFirstAcceptedValue(proposalState) != null;
-	}
-
-	public Object getFirstAcceptedValue(int slotNumber) {
-		PrepareState state = this.responses.get(slotNumber);
-		return getFirstAcceptedValue(state);
-	}
-	
-	private Object getFirstAcceptedValue(PrepareState proposalState) {
-		for (PrepareResponse prepareResponse : proposalState.getProposalResponses()) {
-			if (prepareResponse.getContent() != null) {
-				return prepareResponse.getContent();
-			}
-		}
-		
-		return null;
-	}
-	*/
 	
 	/**
 	 * getAcceptedValueIfAny() returns the PaxosValue of the highest prepare reply we've
@@ -233,7 +204,6 @@ public class Proposer {
 	public int getNumberOfAcceptors() {
 		return this.numberOfAcceptors;
 	}
-	
 	
 	/**
 	 * isValueChosen() is called by the ProposerSystem to verify if the chosen
