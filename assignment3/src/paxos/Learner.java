@@ -1,11 +1,6 @@
 package paxos;
-import java.util.Collections;
 import java.util.Hashtable;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Set;
-import java.util.Vector;
 
 public class Learner {
 	private LearnedValues learnedValues;

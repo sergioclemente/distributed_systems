@@ -1,6 +1,8 @@
 package paxos;
 
 import java.util.LinkedHashMap;
+import java.util.Map;
+
 import util.ISerialization;
 
 public class Acceptor {
@@ -14,23 +16,46 @@ public class Acceptor {
 		this.hostIdentifier = hostIdentifier;
 		this.serialization = serialization;
 
+		this.promisedNumbers = new LinkedHashMap<Integer, PrepareNumber>();
+		this.acceptedNumbers = new LinkedHashMap<Integer, PrepareNumber>();
+		this.acceptedValues = new LinkedHashMap<Integer, PaxosValue>();
+
 		if (this.serialization != null) {
-			this.promisedNumbers = (LinkedHashMap<Integer, PrepareNumber>) this.serialization.restoreState("promisedNumbers");
-			if (this.promisedNumbers == null)
-				this.promisedNumbers = new LinkedHashMap<Integer, PrepareNumber>();
-			
-			this.acceptedNumbers = (LinkedHashMap<Integer, PrepareNumber>) this.serialization.restoreState("acceptedNumbers");
-			if (this.acceptedNumbers == null)
-				this.acceptedNumbers = new LinkedHashMap<Integer, PrepareNumber>();
-			
-			this.acceptedValues = (LinkedHashMap<Integer, PaxosValue>) this.serialization.restoreState("acceptedValues");
-			if (this.acceptedValues == null)
-				this.acceptedValues = new LinkedHashMap<Integer, PaxosValue>();
-			
-		} else {
-			this.promisedNumbers = new LinkedHashMap<Integer, PrepareNumber>();
-			this.acceptedNumbers = new LinkedHashMap<Integer, PrepareNumber>();
-			this.acceptedValues = new LinkedHashMap<Integer, PaxosValue>();
+
+			LinkedHashMap<String, LinkedHashMap<String, Object>> promisedNumbers;
+			promisedNumbers = (LinkedHashMap<String, LinkedHashMap<String, Object>>) this.serialization.restoreState("promisedNumbers");
+			if (promisedNumbers != null) {
+				for (Map.Entry<String, LinkedHashMap<String, Object>> entry : promisedNumbers.entrySet()) {
+					LinkedHashMap<String, Object> fields = entry.getValue();
+					Integer slotNumber = Integer.valueOf(entry.getKey()); 
+					long value = ((Double) fields.get("value")).longValue();
+					this.promisedNumbers.put(slotNumber, new PrepareNumber(value));
+				}
+			}
+					
+			LinkedHashMap<String, LinkedHashMap<String, Object>> acceptedNumbers;
+			acceptedNumbers = (LinkedHashMap<String, LinkedHashMap<String, Object>>) this.serialization.restoreState("acceptedNumbers");
+			if (acceptedNumbers != null) {
+				for (Map.Entry<String, LinkedHashMap<String, Object>> entry : acceptedNumbers.entrySet()) {
+					LinkedHashMap<String, Object> fields = entry.getValue();
+					Integer slotNumber = Integer.valueOf(entry.getKey()); 
+					long value = ((Double) fields.get("value")).longValue();
+					this.acceptedNumbers.put(slotNumber, new PrepareNumber(value));
+				}
+			}
+					
+			LinkedHashMap<String, LinkedHashMap<String, Object>> acceptedValues;
+			acceptedValues = (LinkedHashMap<String, LinkedHashMap<String, Object>>) this.serialization.restoreState("acceptedValues");
+			if (acceptedValues != null) {
+				for (Map.Entry<String, LinkedHashMap<String, Object>> entry : acceptedValues.entrySet()) {
+					LinkedHashMap<String, Object> fields = entry.getValue();
+					Integer slotNumber = Integer.valueOf(entry.getKey()); 
+					byte proposer = ((Double) fields.get("proposer")).byteValue();
+					String command = (String) fields.get("command");
+					PaxosValue v = new PaxosValue(proposer, command);
+					this.acceptedValues.put(slotNumber, v);
+				}
+			}
 		}
 	}
 
@@ -71,7 +96,7 @@ public class Acceptor {
 				currentAcceptedValue);
 
 		if (this.serialization != null) {
-			this.serialization.saveState("prepareNumbers", this.promisedNumbers);
+			this.serialization.saveState("promisedNumbers", this.promisedNumbers);
 		}
 
 		return prepareResponse;

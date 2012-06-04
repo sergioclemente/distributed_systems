@@ -9,7 +9,7 @@ public class PrepareNumber implements Comparable<PrepareNumber> {
 		this.value = (sequenceNumber << 8) | hostIdentifier;
 	}
 	
-	private PrepareNumber(long value) {
+	public PrepareNumber(long value) {
 		this.value = value;
 	}
 	
