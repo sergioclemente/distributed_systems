@@ -189,6 +189,13 @@ public class StorageSystemServer implements IStorageServer
     		String contents = command.substring(methodName.length()+1);
 			contents += "\n";
 			
+			int idx = contents.indexOf(" ");
+			if (idx == -1) {
+				contents = "\n";
+			} else {
+				contents = contents.substring(idx+1);
+			}
+			
     		if (methodName.equals("put"))
     		{
     			putFile(fileName, contents);
